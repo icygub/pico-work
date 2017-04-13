@@ -3,6 +3,7 @@ version 8
 __lua__
 -- zeldo - alan morgan
 
+backup_actors = {} -- for when you switch rooms.
 actors = {} -- all actors in world.
 marker = 0  -- a number representing where you are in the story.
 offh = 16*4
@@ -125,6 +126,7 @@ function scene_init(prev_marker)
 	elseif marker == 4 then
 		draw_map = draw_overworld
 		if prev_marker == 6 then
+			load_actors()
 			pl.x = 8
 			pl.y = 5.5
 			view_update()
@@ -133,6 +135,7 @@ function scene_init(prev_marker)
 	elseif marker == 5 then
 		music(14)
 	elseif marker == 6 then -- hut
+		save_actors()
 		if prev_marker == 4 then
 			draw_map = draw_hut
 			pl.x = offw + 2.5
@@ -140,6 +143,17 @@ function scene_init(prev_marker)
 			view_update()
 		end
 	end
+end
+
+function save_actors()
+	backup_actors = actors
+	actors = {}
+	add(actors, pl)
+end
+
+function load_actors()
+	actors = backup_actors
+	backup_actors = {}
 end
 
 function hut_update()

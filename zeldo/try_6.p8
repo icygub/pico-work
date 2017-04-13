@@ -208,7 +208,10 @@ function make_actor(x, y)
 	a.touchable=true
 
 	-- if true, then you can hurt other actors.
+	-- but you can only hurt actors not on your team.
 	a.hurt = false
+	a.good = false
+	a.bad  = false
 
 	-- if false, then the draw function for the sprite is not called.
 	a.visible=true
@@ -435,10 +438,20 @@ end
 function control_player(pl)
 	-- how fast to accelerate
 	accel = .1
-	if (btn(0)) pl.dx -= accel 
-	if (btn(1)) pl.dx += accel 
-	if (btn(2)) pl.dy -= accel 
-	if (btn(3)) pl.dy += accel 
+	-- move if no bomb/shield or sword.
+	if not btn(4) and not btn(5) then
+		if btn(0) then pl.dx -= accel end
+		if btn(1) then pl.dx += accel end
+		if btn(2) then pl.dy -= accel end
+		if btn(3) then pl.dy += accel end
+	elseif btn(5) then
+		if pl.sword == nil then
+			if btnp(0) then     pl.sword=gen_sword(pl.x, pl.y, 0)
+			elseif btnp(1) then pl.sword=gen_sword(pl.x, pl.y, 1)
+			elseif btnp(2) then pl.sword=gen_sword(pl.x, pl.y, 2)
+			elseif btnp(3) then pl.sword=gen_sword(pl.x, pl.y, 3) end
+		end
+	end
 
 	-- play a sound if moving
 	-- (every 4 ticks)
@@ -448,6 +461,67 @@ function control_player(pl)
 		-- sfx(1)
 	end
 	
+end
+
+function gen_sword(x, y, dir)
+	local time = 10
+	local spd = .3
+	local off = .5
+
+	local dx = 0
+	local dy = 0
+
+	if dir == 0 then
+		x -= off
+		dx = -spd
+	elseif dir == 1 then
+		x += off
+		dx = spd
+	elseif dir == 2 then
+		y -= off
+		dy = -spd
+	elseif dir == 3 then
+		y += off
+		dy = spd
+	end
+
+	local sword = make_actor(x, y)
+	if dir == 0 or dir == 1 then
+		sword.spr = 57
+	else
+		sword.spr = 56
+	end
+
+	sword.dx = dx
+	sword.dy = dy
+	sword.w  = .5
+	sword.h  = .5
+
+	sword.solid = false
+	sword.touchable = false
+	sword.good = true
+	sword.hurt = true
+	sword.dir = dir
+	sword.destroy =
+		function(self)
+			pl.sword = nil
+		end
+
+	sword.move =
+		function(self)
+			if self.t >= time then
+				self.alive = false
+			end
+		end
+
+	sword.draw =
+		function(self)
+			local fx = (self.dir == 0)
+			local fy = (self.dir == 3)
+			draw_actor(self, nil, nil, fx, fy)
+		end
+
+	return sword
 end
 
 -- a utility function for drawing actors to the screen. auto offsets and
@@ -697,10 +771,12 @@ function gen_link(x, y)
 	pl.move = control_player
 	pl.hearts = 3
 	pl.hurt=true
+	pl.good=true
 	pl.bounce=.3
+	pl.sword=nil
 
 	pl.hit=function(other)
-		if other.hurt then
+		if other.bad then
 			if pl.hearts > 0 then
 				pl.hearts = pl.hearts - 1
 			end
@@ -758,6 +834,7 @@ function gen_enemy(x, y)
 	bad.dy=0
 	bad.inertia=.5
 	bad.hurt=true
+	bad.bad=true
 	bad.hearts=0
 	bad.radx = 5
 	bad.rady = 5
@@ -765,7 +842,7 @@ function gen_enemy(x, y)
 	bad.move = function(self) end
 	bad.hit=
 		function(other)
-			if other == pl then
+			if other.good then
 				bad.alive = false
 			end
 		end
@@ -1170,14 +1247,14 @@ d006700d0d6d566d66d566d00666666011cccccccccccc1153535353545454540655555655566550
 000670000d6d566d66d566d0702882071ccccccccccccc14cccccccc544544547700004444555450099994407777777777777777039900000000993040000004
 000670000d6d566d66d566d07702207711cccccccccccc11cccccccc544544547777700000444400044444407777777777777777033300000000333044444444
 000070000d6d566d66d566d07777777731ccccccccccccc1cccccccc544544547777770070000007000000007777777777777777000000000000000044444444
-777770000d6d566d66d566d02888e9aaaaaaaaaaaa9e888277777777777777777777777777777777000000000005000050575005757775077777770777777757
-077700000d6d566d66d566d0228e99eaaaaaaaaaae99e822777cc777770000777777777777777777000000000000000550505007757075077770775777757777
-007000000d6d566d66d566d02888e9aaaaaaaaaaaa9e8882776cc677705cc5077777777777777777000000000000500055507500777077507775777077777775
-000000000dd5556d6d5556d0228e99eaaaaaaaaaae99e8227cc66cc770c66c077777777777777777000000005050000075700500777507507777077577775777
-000000000d6d566d66d566d02888e9aaaaaaaaaaaa9e88827cc66cc770c66c077777777777777777000000000000000005000550070507750707577757577777
-000000000d6d566d66d566d0228e99eaaaaaaaaaae99e822776cc677705cc5077777777777777777000000000500050007050750070757755757777777777777
-000000000d6d566d66d566d02888e9aaaaaaaaaaaa9e8882777cc777770000777777777777777777000000000000000000050055505750777077707775777577
-000000000000000000000000228e99eaaaaaaaaaae99e82277777777777777777777777777777777000000000000005000055075505770777577757777777777
+777770000d6d566d66d566d02888e9aaaaaaaaaaaa9e888277775577777777777777577777777777000000000005000050575005757775077777770777777757
+077700000d6d566d66d566d0228e99eaaaaaaaaaae99e82277055077770000777775657771177777000000000000000550505007757075077770775777757777
+007000000d6d566d66d566d02888e9aaaaaaaaaaaa9e888270151107705cc507777565777d777777000000000000500055507500777077507775777077777775
+000000000dd5556d6d5556d0228e99eaaaaaaaaaae99e8227011110770c66c07777565772d555557000000005050000075700500777507507777077577775777
+000000000d6d566d66d566d02888e9aaaaaaaaaaaa9e88827011110770c66c07777565770d666665000000000000000005000550070507750707577757577777
+000000000d6d566d66d566d0228e99eaaaaaaaaaae99e82270111107705cc507717565712d555557000000000500050007050750070757755757777777777777
+000000000d6d566d66d566d02888e9aaaaaaaaaaaa9e8882770000777700007771ddddd17d777777000000000000000000050055505750777077707775777577
+000000000000000000000000228e99eaaaaaaaaaae99e82277777777777777777772027771177777000000000000005000055075505770777577757777777777
 005777755777750000000000000000007755557777944977773b3b37777777770000000000000000000000000000777777770000000000777777700000007777
 05475574470674500606060606060600750660577744447773b3b3b3777707770eeeeeeeeeeeee0eeeeeeee00ee0777777770eeeeeeee00777770eeeeeee0777
 0547777447777450065656565656565075666657722222277b35353b7700407700888888888888088888888e0880777777770888888888007770888888888077

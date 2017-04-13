@@ -2,9 +2,12 @@ pico-8 cartridge // http://www.pico-8.com
 version 8
 __lua__
 
-actors = {} --all actors in world
+actors = {}   -- all actors in world
 offh = 16*4
 offw = 16*6
+
+global_time=0 -- the global timer of the game, used by text box functions
+tbox_messages={} -- the array for keeping track of text box overflows
 
 -------------------------
 -- pico main
@@ -13,12 +16,18 @@ function _init()
 	palt(0,false)
 	srand(time())
 
+	tbox("ivan", "hey, listen zeldo! princess lank is in trouble you gotta rescue her!")
+	tbox("lewis", "i have my wayz.")
+	tbox("lank", "ill save her.")
 	init_map()
 	-- init_boss()
 end
 
 function _update()
 	map_update()
+
+	global_time=global_time+1 -- increment the clock
+	tbox_interact()
 end
 
 function _draw()
@@ -28,7 +37,9 @@ function _draw()
 	print(pl.x, 0, 0, 7)
 	print(pl.y, 0, 10, 7)
 	print(pl.t, 0, 20, 7)
-	print("hey listen!\nprincess lank is in trouble,\nyou gotta save her!", 20, 100, 7)
+
+	-- rectfill(0, 0, 127, 127, 2) -- draw a fill color for sizing
+	tbox_draw() -- draw the message boxes (if any)
 end
 
 -- make an actors and add to global collection.
@@ -731,6 +742,178 @@ function draw_game_over()
 
 end
 
+------------------------------------------------------------------------------
+-- Text Box implementation, taken from https://github.com/jessemillar/pico-8
+-- Fixed bugs for this game though.
+------------------------------------------------------------------------------
+-- turns a long word into a list of words with each one ending in a dash except
+-- the last one. this function assumes the parameter is a word (no spaces).
+function break_up_long_word(word_list, word, max_len)
+	local ind = 0
+
+	local substr = ""
+	while ind < #word do
+		if #word <= ind + max_len then
+			substr = sub(word, ind, ind+max_len)
+		else
+			substr = sub(word, ind, ind+max_len - 1).."-"
+		end
+
+		add(word_list, substr)
+		ind += max_len
+	end
+
+	return word_list
+end
+
+function words_to_list(str, line_len)
+	-- convert the message to an array of words.
+	local collect_word = ""
+	local words = {}
+	for i=0, #str, 1 do
+		local cur_char = sub(str, i, i)
+
+		-- if we hit a space and our collection is not empty.
+		if cur_char == " " and #collect_word > 0 then
+			words = break_up_long_word(words, collect_word, line_len)
+			collect_word = ""
+
+		-- if we didn't hit a space and our collection is not empty.
+		elseif cur_char != " " then
+			collect_word = collect_word..cur_char
+		end
+	end
+
+	if #collect_word > 0 then
+		words = break_up_long_word(words, collect_word, line_len)
+	end
+
+	return words
+end
+
+function words_to_lines(words, line_len)
+	-- now that we have a list of the words, add the lines.
+	local cur_line = ""
+	local first = 0
+	local line_list = {}
+	for word in all(words) do
+		-- we can't fit the next word on this line, so we will push this line and
+		-- start a new line.
+		if #cur_line + #word + first > line_len then
+			add(line_list, cur_line)
+			cur_line = ""
+			first = 0
+		end
+
+		if first == 1 then cur_line = cur_line.." " end
+		cur_line = cur_line..word
+
+		if first == 0 then
+			first = 1
+		end
+	end
+
+	if #cur_line > 0 then
+		add(line_list, cur_line)
+	end
+
+	return line_list
+end
+
+-- add a new text box
+function tbox(speaker, message)
+	local line_len=26
+
+	-- if there are an odd number of lines.
+	if #tbox_messages%2==1 then -- add an empty line as a second line to the previous dialogue.
+		tbox_line(speaker, "")
+	end
+
+	local words = words_to_list(message, line_len)
+	local lines = words_to_lines(words, line_len)
+
+	for l in all(lines) do
+		printh("hi man")
+		tbox_line(speaker, l)
+	end
+end
+
+-- a utility function for easily adding a line to the messages array
+function tbox_line(speaker, l)
+	local line={speaker=speaker, line=l, animation=0}
+	add(tbox_messages, line)
+end
+
+-- check for button presses so we can clear text box messages
+function tbox_interact()
+	if btnp(4) and #tbox_messages>0 then
+		sfx(0) -- play a sound effect
+
+		if #tbox_messages>1 then
+			del(tbox_messages, tbox_messages[1])
+		end
+
+		del(tbox_messages, tbox_messages[1])
+	end
+end
+
+-- check if a text box is currently visible (useful if the dialogue clear button is used for other actions as well)
+function tbox_active()
+	if #tbox_messages>0 then
+		return true
+	else
+		return false
+	end
+end
+
+-- draw the text boxes (if any)
+function tbox_draw()
+	if #tbox_messages>0 then -- only draw if there are messages
+		rectfill(3, 103, 124, 123, 7) -- draw border rectangle
+		rectfill(5, 106, 122, 121, 1) -- draw fill rectangle
+		line(5, 105, 122, 105, 6) -- draw top border shadow 
+		line(3, 124, 124, 124, 6) -- draw bottom border shadow 
+
+		-- draw the speaker portrait
+		if #tbox_messages[1].speaker>0 then
+			local speaker_width=#tbox_messages[1].speaker*4
+
+			if speaker_width>115 then
+				speaker_width=115
+			end
+
+			rectfill(3, 96, speaker_width+9, 102, 7) -- draw border rectangle
+			rectfill(5, 99, speaker_width+7, 105, 1) -- draw fill rectangle
+			line(5, 98, speaker_width+7, 98, 6) -- draw top border shadow 
+
+			print(sub(tbox_messages[1].speaker, 0, 28), 7, 101, 7)
+		end
+
+		-- print the message
+		if tbox_messages[1] != nil and tbox_messages[1].animation<#tbox_messages[1].line then
+			sfx(1)
+			tbox_messages[1].animation+=1
+		elseif tbox_messages[2] != nil and tbox_messages[2].animation<#tbox_messages[2].line then
+			sfx(1)
+			tbox_messages[2].animation+=1
+		end
+			
+		print(sub(tbox_messages[1].line, 0, tbox_messages[1].animation), 7, 108, 7) 
+		if #tbox_messages>1 then -- only draw a second line if one exist
+			print(sub(tbox_messages[2].line, 0, tbox_messages[2].animation), 7, 115, 7) 
+		end
+		
+		-- draw and animate the arrow
+		palt(0,true)
+		if global_time%10<5 then
+			spr(48, 116, 116)
+		else
+			spr(48, 116, 117)
+		end
+		palt(0,false)
+	end
+end
+
 __gfx__
 00000000330000333333333333333333555555555d55555555555555400004445445455444444444444422222222444422442422777777777777777777777777
 0000000030533503333333b33333333355666655d555555d55555555006660044454445444444444444444444444444422442422777777777777777777777777
@@ -756,9 +939,9 @@ __gfx__
 0222d2200d6d566d66d566d0702882071ccccccccccccc14cccccccc404440447777777777777777777777777777777777777777777777777777777777777777
 052222500d6d566d66d566d07702207711cccccccccccc11cccccccc400000447777777777777777777777777777777777777777777777777777777777777777
 000000000d6d566d66d566d07777777731ccccccccccccc1cccccccc444444447777777777777777777777777777777777777777777777777777777777777777
-000000000d6d566d66d566d02888e9aaaaaaaaaaaa9e888277777777777777777777777777777777000000000005000050575005757775077777770777777757
-000000000d6d566d66d566d0228e99eaaaaaaaaaae99e82277777777777777777777777777777777000000000000000550505007757075077770775777757777
-000000000d6d566d66d566d02888e9aaaaaaaaaaaa9e888277777777777777777777777777777777000000000000500055507500777077507775777077777775
+777770000d6d566d66d566d02888e9aaaaaaaaaaaa9e888277777777777777777777777777777777000000000005000050575005757775077777770777777757
+077700000d6d566d66d566d0228e99eaaaaaaaaaae99e82277777777777777777777777777777777000000000000000550505007757075077770775777757777
+007000000d6d566d66d566d02888e9aaaaaaaaaaaa9e888277777777777777777777777777777777000000000000500055507500777077507775777077777775
 000000000dd5556d6d5556d0228e99eaaaaaaaaaae99e82277777777777777777777777777777777000000005050000075700500777507507777077577775777
 000000000d6d566d66d566d02888e9aaaaaaaaaaaa9e888277777777777777777777777777777777000000000000000005000550070507750707577757577777
 000000000d6d566d66d566d0228e99eaaaaaaaaaae99e82277777777777777777777777777777777000000000500050007050750070757755757777777777777

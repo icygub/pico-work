@@ -3,6 +3,58 @@ version 8
 __lua__
 -- zeldo - alan morgan.
 
+-------------------------
+-- pico main
+-------------------------
+function _init()
+	color(0)
+	palt(0,false)
+	srand(time())
+
+	init_game()
+	make_scenes()
+	make_triggers()
+
+	scene_init()
+end
+
+function _update()
+	local prev_marker = marker
+
+	if marker == "title" then
+		title_update()
+	else
+		scene_update()
+	end
+
+	if prev_marker != marker then
+		scene_init(prev_marker)
+	end
+
+	global_time=global_time+1 -- increment the clock
+end
+
+function _draw()
+	scene_draw()
+	draw_triggers() -- debugging
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+marker = "title"  -- where you are in the story, start on title screen.
+scene_actors = {}
+draw_map_funcs = {}
+
 -----------------------------------
 -- These are just in charge of creating the sprites that go in each scene.
 -----------------------------------
@@ -14,7 +66,7 @@ function make_map()
 	gen_poe(57.5,10.5)
 	gen_enemies()
 
-	actors_map = actors
+	scene_actors["overworld"] = actors
 	actors = {}
 end
 
@@ -23,7 +75,7 @@ function make_hut(prev_marker)
 
 	gen_chest(offw + 1.5, 32 + 1.5)
 
-	actors_hut = actors
+	scene_actors["hut"] = actors
 	actors = {}
 end
 
@@ -32,7 +84,7 @@ function make_boss(prev_marker, x, y)
 
 	ganon = gen_ganondorf(offw + 16,3.5)
 
-	actors_boss = actors
+	scene_actors["boss"] = actors
 	actors = {}
 end
 
@@ -50,15 +102,15 @@ end
 
 -- Use when switching to a new scene.
 -- x and y are the player's new coordinates.
-function load_scene(actorlist, x, y)
+function load_scene(scene_name, x, y)
 	save_scene()
-	actors = actorlist
+	actors = scene_actors[scene_name]
 
 	if x != nil then pl.x = x end
 	if y != nil then pl.y = y end
 	view_update()
 
-	add(actorlist, pl)
+	add(actors, pl)
 end
 
 -- sets up the game and player, but not the various objects that are scene
@@ -70,74 +122,139 @@ function init_game()
 	pl.visible = false
 end
 
--------------------------
--- pico main
--------------------------
-function _init()
-	color(0)
-	palt(0,false)
-	srand(time())
-
-	init_game()
-	make_scenes()
-
-	scene_init()
+function init_draw_map_funcs()
+	draw_map_funcs["hut"]       = draw_hut
+	draw_map_funcs["boss"]      = draw_boss
+	draw_map_funcs["overworld"] = draw_overworld
 end
 
 -- Gets called whenever the scene switches.
 function scene_init(prev_marker)
-	if marker == 0 then
-		load_scene(actors_map)
-	elseif marker == 3 then
-		load_scene(actors_boss, offx + 16, 30.5)
-		draw_map = draw_boss
-	elseif marker == 4 then
-		if prev_marker == 6 then
-			load_scene(actors_map, 8, 5.5)
-		end
+	local x = 0
+	local y = 0
 
-		draw_map = draw_overworld
-		music(0,30)
-	elseif marker == 5 then
-		music(14)
-	elseif marker == 6 then -- hut
-		if prev_marker == 0 then
+	if marker == "boss" then
+		x = offw + 16
+		y = 30.5
+	elseif marker == "overworld" then
+		if prev_marker == "hut" then
+			x = 8
+			y = 5.5
+		elseif prev_marker == "title" then -- temp else
+			x = 8
+			y = 5.5
+		end
+	elseif marker == "hut" then
+		if prev_marker == "title" then
 			pl.visible = true
-			load_scene(actors_hut, offw + 2.5, 32 + 2)
+			x = offw + 2.5
+			y = 32 + 2
 
 			tbox("ivan",  "hey, listen zeldo! princess lank is in trouble you gotta rescue her!")
 			tbox("zeldo", "okie dokie. sounds fun!")
-		elseif prev_marker == 4 then
-			load_scene(actors_hut, offw + 2.5, 32 + 4.5)
+		elseif prev_marker == "overworld" then
+			x = offw + 2.5
+			y = 32 + 4.5
 		end
+	end
 
-		draw_map = draw_hut
+	load_scene(marker, x, y)
+end
+
+function scene_draw()
+	if marker == "title" then
+		draw_title()
+		return
+	end
+
+	if marker == "hut" then
+		draw_map(offw, 32, 5, 5)
+	elseif marker == "boss" then
+		draw_map(offw, 0, 32, 32)
+	elseif marker == "overworld" then
+		draw_map(0, 0, offw, offh)
+	end
+
+	draw_things()
+	draw_hearts()
+	draw_power_orbs()
+
+	if pl.alive == false then
+		draw_game_over()
+		draw_link_death()
+	end
+
+	draw_fairy()
+	tbox_draw()
+end
+
+function scene_update()
+	if not tbox_active() then
+		map_update()
+		trigger_update()
+		view_update()
+	else
+		tbox_interact()
 	end
 end
 
-function gen_chest(x,y)
-	local chest = make_actor(x,y)
-	chest.spr=114
-	chest.static=true
-	chest.open=
-		function()
-			tbox("", "you opened a chest")
-		end
+function make_triggers()
+	triggers = {}
 
-	chest.move=
-		function(self)
-			if pl.x > self.x - self.w and pl.x < self.x + self.w
-			and pl.y > self.y + self.h and pl.y < self.y + 2.5*self.h
-			and btnp(4) and chest.spr != 115 then
-				chest.spr=115
-				chest.open()
+	-- Trigger Positions
+	triggers["hut_enter"] = {box={x1=7,      y1=4.5,  x2=9,      y2=5.5 }}
+	triggers["hut_exit"]  = {box={x1=offw+1, y1=32+5, x2=offw+4, y2=32+7}}
+	triggers["no_sword"]  = {box={x1=7,      y1=10,   x2=9,      y2=12  }}
+
+	-- Trigger Functions
+	triggers["hut_enter"].func =
+		function() marker="hut" end
+
+	triggers["hut_exit"].func =
+		function() marker="overworld" end
+
+	triggers["no_sword"].func =
+		function()
+			if triggers["no_sword"].trig == nil then
+				tbox("ivan", "hey, listen! you don't have a sword yet! how can you save lank like this?")
+				triggers["no_sword"].trig = true
 			end
 		end
-	return chest
+end
+
+-- used for debugging purposes.
+function draw_triggers()
+	for k,v in pairs(triggers) do
+		rect(v.box.x1*8 + offset_x(),
+			  v.box.y1*8 + offset_y(),
+			  v.box.x2*8 + offset_x(),
+			  v.box.y2*8 + offset_y(), 10)
+	end
+end
+
+function trigger_update()
+	for k, v in pairs(triggers) do
+		if is_pl_in_box(v.box) then
+			v.func()
+		end
+	end
+end
+
+-- updates the view with the player's coordinates. call whenever the player
+-- changes position.
+function view_update()
+	viewx = pl.x
+	viewy = pl.y
+end
+
+function title_update()
+	if btnp(4) then
+		marker = "hut"
+		sfx(30)
+	end
 end
 
 actors = {} -- all actors in world.
-marker = 0  -- a number representing where you are in the story.
 offh = 16*4
 offw = 16*6
 
@@ -156,110 +273,21 @@ function draw_power_orbs()
 	print(power_orb_count, 9, 1, 7)
 end
 
-function _update()
-	local prev_marker = marker
-	scene_update()
-	if prev_marker != marker then
-		scene_init(prev_marker)
-	end
-
-	global_time=global_time+1 -- increment the clock
+function draw_map(x, y, w, h)
+	cls(0)
+	local offx = -pl.x*8+64
+	local offy = -pl.y*8+64
+	map(x, y, x * 8 + offx, y * 8 + offy, w, h)
 end
 
-function _draw()
-	scene_draw()
+function is_pl_in_box(box)
+	return pl.x > box.x1 and pl.x < box.x2 and pl.y > box.y1 and pl.y < box.y2
 end
 
-function scene_draw()
-	if marker == 0 then -- title screen
-		draw_title()
-	elseif marker == 1 then -- first master sword scene
-		draw_map()
-		draw_things()
-		draw_hearts()
-		draw_power_orbs()
-		draw_fairy()
-		tbox_draw()
-	elseif marker == 2 then -- second master sword scene
-	elseif marker == 3 then -- boss battle
-		draw_map()
-		draw_things()
-	elseif marker == 4 then -- normal game scene
-		draw_map()
-		draw_things()
-		draw_hearts()
-		draw_power_orbs()
-		draw_fairy()
-		tbox_draw()
-	elseif marker == 5 then -- game over
-		draw_map()
-		draw_things()
-		draw_hearts()
-		draw_power_orbs()
-		draw_game_over()
-		draw_link_death()
-		draw_fairy()
-	elseif marker == 6 then -- hut
-		draw_map()
-		draw_things()
-		draw_hearts()
-		draw_power_orbs()
-		draw_fairy()
-		tbox_draw()
-	end
-end
-
-function scene_update()
-	if marker == 0 then -- title screen
-		title_update()
-	elseif marker == 1 then -- first master sword scene
-		tbox_interact()
-		view_update()
-		if not tbox_active() then
-			marker = 6
-		end
-	elseif marker == 2 then -- second master sword scene
-		tbox_interact()
-		view_update()
-	elseif marker == 3 then -- boss battle
-	elseif marker == 4 then -- normal game scene
-		tbox_interact()
-		map_update()
-		room_update()
-		view_update()
-	elseif marker == 5 then -- game over
-	elseif marker == 6 then -- hut
-		tbox_interact()
-		if not tbox_active() then
-			map_update()
-			hut_update()
-			view_update()
-		end
-	end
-end
-
-function room_update()
-	if pl.x < 12 and pl.y < 5.5 then
-		marker = 6
-	end
-end
-
-function hut_update()
-	if pl.y > 32 + 5 then
-		marker = 4
-	end
-end
-
-function view_update()
-	viewx = pl.x
-	viewy = pl.y
-end
-
-function title_update()
-	if btnp(4) then
-		marker = 6
-		sfx(30)
-	end
+-- relative to the actor a passed.
+function is_pl_in_box_rel(a, x1, y1, x2, y2)
+	local box = {x1=a.x+x1, y1=a.y+y1, x2=a.x+x2, y2=a.y+y2}
+	return is_pl_in_box(box)
 end
 
 -- make an actors and add to global collection.
@@ -533,6 +561,31 @@ function control_player(pl)
 	
 end
 
+function gen_chest(x,y)
+	local chest = make_actor(x,y)
+	chest.spr=114
+	chest.static=true
+	chest.open=
+		function()
+			tbox("", "you opened a chest")
+		end
+
+	chest.move=
+		function(self)
+			local x1 = -self.w
+			local x2 =  self.w
+			local y1 =  self.h
+			local y2 =  2.5*self.h
+
+			if is_pl_in_box_rel(self, x1, x2, y1, y2)
+			and btnp(4) and chest.spr != 115 then
+				chest.spr=115
+				chest.open()
+			end
+		end
+	return chest
+end
+
 function gen_sword(x, y, dir, master)
 	local time = 10
 	local spd = .3
@@ -600,12 +653,20 @@ function gen_sword(x, y, dir, master)
 	return sword
 end
 
+function offset_x()
+	return -viewx * 8 + 64
+end
+
+function offset_y()
+	return -viewy * 8 + 64
+end
+
 -- a utility function for drawing actors to the screen. auto offsets and
 -- assumes white is the default background color.
 function draw_actor(a, w, h, flip_x, flip_y, alt)
 	if a.alive then
-		local sx = (a.x * 8) - viewx * 8 + 64 - a.sw/2
-		local sy = (a.y * 8) - viewy * 8 + 64 - a.sh/2
+		local sx = (a.x * 8) + offset_x() - a.sw/2
+		local sy = (a.y * 8) + offset_y() - a.sh/2
 
 		if w == nil then w = 1 end
 		if h == nil then h = 1 end
@@ -709,10 +770,9 @@ end
 function map_update()
 	if pl.alive then
 		foreach(actors, move_actor)
-	else
-		marker = 5
 	end
 
+	-- call outside and destroy functions
 	update_outside()
 	garbage_collection()
 end
@@ -744,20 +804,6 @@ function draw_title()
 	if global_time % 30 < 20 then
 		print("press z to start", 32, 72, 7)
 	end
-end
-
-function draw_boss()
-	cls(0)
-	local offx = -pl.x*8+64
-	local offy = -pl.y*8+64
-	map(offw, 0, offw*8 + offx, offy, 32, 32)
-end
-
-function draw_hut()
-	cls(0)
-	local offx = -pl.x*8+64
-	local offy = -pl.y*8+64
-	map(offw, 32, offw*8 + offx, 32*8 + offy, 5, 5)
 end
 
 function draw_things()
@@ -1200,7 +1246,6 @@ function tbox(speaker, message)
 	local lines = words_to_lines(words, line_len)
 
 	for l in all(lines) do
-		printh("hi man")
 		tbox_line(speaker, l)
 	end
 end
@@ -1280,1018 +1325,6 @@ function tbox_draw()
 		palt(0,false)
 	end
 end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

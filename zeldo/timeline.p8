@@ -744,7 +744,9 @@ function gen_enemy(x, y)
 	bad.hit=
 		function(other)
 			if other == pl then
-				gen_power_orb(bad.x, bad.y)
+				orb = gen_power_orb(bad.x, bad.y)
+				orb.dx = bad.dx*3
+				orb.dy = bad.dy*3
 				bad.alive = false
 			end
 		end

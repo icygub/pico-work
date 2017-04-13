@@ -57,6 +57,7 @@ function scene_draw()
 		draw_things()
 		draw_hearts()
 		draw_fairy()
+		tbox_draw()
 	elseif marker == 5 then -- game over
 		draw_map()
 		draw_things()
@@ -87,14 +88,18 @@ function scene_update()
 		view_update()
 	elseif marker == 3 then -- boss battle
 	elseif marker == 4 then -- normal game scene
+		tbox_interact()
 		map_update()
 		room_update()
 		view_update()
 	elseif marker == 5 then -- game over
 	elseif marker == 6 then -- hut
-		map_update()
-		hut_update()
-		view_update()
+		tbox_interact()
+		if not tbox_active() then
+			map_update()
+			hut_update()
+			view_update()
+		end
 	end
 end
 
@@ -108,18 +113,8 @@ function scene_init(prev_marker)
 	if marker == 0 then
 		init_map()
 		pl.visible = false
-	elseif marker == 1 then
-		draw_map = draw_hut
-		pl.x = offw + 2.5
-		pl.y = 32 + 2.0
-		pl.visible = true
-		view_update()
-		tbox("ivan",  "hey, listen zeldo! princess lank is in trouble you gotta rescue her!")
-		tbox("zeldo", "okie dokie. sounds fun!")
-		
-		-- first master sword scene
-	elseif marker == 2 then
-		-- second master sword scene
+	elseif marker == 1 then -- first master sword scene
+	elseif marker == 2 then -- second master sword scene
 	elseif marker == 3 then
 		init_boss()
 		draw_map = draw_boss
@@ -136,12 +131,22 @@ function scene_init(prev_marker)
 		music(14)
 	elseif marker == 6 then -- hut
 		save_actors()
-		if prev_marker == 4 then
+
+		draw_map = draw_hut
+		if prev_marker == 0 then
+			pl.x = offw + 2.5
+			pl.y = 32 + 2.0
+			pl.visible = true
+
+			tbox("ivan",  "hey, listen zeldo! princess lank is in trouble you gotta rescue her!")
+			tbox("zeldo", "okie dokie. sounds fun!")
+		elseif prev_marker == 4 then
 			draw_map = draw_hut
 			pl.x = offw + 2.5
 			pl.y = 32 + 4.5
-			view_update()
 		end
+
+		view_update()
 	end
 end
 
@@ -169,7 +174,7 @@ end
 
 function title_update()
 	if btnp(4) then
-		marker = 1
+		marker = 6
 		sfx(30)
 	end
 end

@@ -54,6 +54,8 @@ end
 marker = "title"  -- where you are in the story, start on title screen.
 scene_actors = {}
 draw_map_funcs = {}
+triggers = {}
+
 
 -----------------------------------
 -- These are just in charge of creating the sprites that go in each scene.
@@ -119,13 +121,6 @@ function init_game()
 	actors = {}
 	pl = gen_link(8, 8)
 	gen_grass()
-	pl.visible = false
-end
-
-function init_draw_map_funcs()
-	draw_map_funcs["hut"]       = draw_hut
-	draw_map_funcs["boss"]      = draw_boss
-	draw_map_funcs["overworld"] = draw_overworld
 end
 
 -- Gets called whenever the scene switches.
@@ -137,6 +132,7 @@ function scene_init(prev_marker)
 		x = offw + 16
 		y = 30.5
 	elseif marker == "overworld" then
+		music(0)
 		if prev_marker == "hut" then
 			x = 8
 			y = 5.5
@@ -156,6 +152,8 @@ function scene_init(prev_marker)
 			x = offw + 2.5
 			y = 32 + 4.5
 		end
+	elseif marker == "title" then
+		pl.visible = false
 	end
 
 	load_scene(marker, x, y)
@@ -198,13 +196,17 @@ function scene_update()
 	end
 end
 
-function make_triggers()
-	triggers = {}
+-- triggers are boxes you collide with that can make events happen.
+function make_trigger(name, x1, y1, x2, y2)
+	triggers[name] = {box={x1=x1, y1=y1, x2=x2, y2=y2}, finished=false, func=function() end}
+end
 
+function make_triggers()
 	-- Trigger Positions
-	triggers["hut_enter"] = {box={x1=7,      y1=4.5,  x2=9,      y2=5.5 }}
-	triggers["hut_exit"]  = {box={x1=offw+1, y1=32+5, x2=offw+4, y2=32+7}}
-	triggers["no_sword"]  = {box={x1=7,      y1=10,   x2=9,      y2=12  }}
+	make_trigger("hut_enter", 7,    4.5,  9,    5.5)
+	make_trigger("hut_exit",  97,   37,   100,  39)
+	make_trigger("no_sword",  7,    10,   9,    12)
+	make_trigger("gan_intro", 108,  1,    116,  9)
 
 	-- Trigger Functions
 	triggers["hut_enter"].func =
@@ -215,10 +217,14 @@ function make_triggers()
 
 	triggers["no_sword"].func =
 		function()
-			if triggers["no_sword"].trig == nil then
-				tbox("ivan", "hey, listen! you don't have a sword yet! how can you save lank like this?")
-				triggers["no_sword"].trig = true
-			end
+			tbox("ivan", "hey, listen! you don't have a sword yet! how can you save lank like this?")
+			triggers["no_sword"].finished=true
+		end
+
+	triggers["gan_intro"].func =
+		function()
+			tbox("gannondorf", "mwahahahahahahahahahaha. did you think you could defeat me?")
+			triggers["gan_intro"].finished=true
 		end
 end
 
@@ -234,7 +240,7 @@ end
 
 function trigger_update()
 	for k, v in pairs(triggers) do
-		if is_pl_in_box(v.box) then
+		if not v.finished and is_pl_in_box(v.box) then
 			v.func()
 		end
 	end
@@ -907,6 +913,10 @@ function gen_link(x, y)
 				pl.alive = false
 			end
 		end
+	end
+
+	pl.destroy=function(other)
+		music(14)
 	end
 
 	return pl

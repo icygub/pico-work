@@ -16,7 +16,7 @@ scene 2 - walk outside house
 	I = look! it's a chest.  Try pressing z near it.
 	L = but it's not mine..
 	I = nevermind that. you're just borrowing it.
-	L = well, I guess I can give it back later.
+	L = well, I guess I could give it back later.
 	you got a boomerang you can now stun enemies boomerangs stun enemies. hold x then press an arrow key to use it.
 
 ivan: hey lank, talk to that man.

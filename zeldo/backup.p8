@@ -51,7 +51,7 @@ end
 
 
 
-marker = "boss"  -- where you are in the story, start on title screen.
+marker = "title"  -- where you are in the story, start on title screen.
 scene_actors = {}
 draw_map_funcs = {}
 triggers = {}
@@ -66,6 +66,7 @@ function make_map()
 	gen_chest(8,8)
 	gen_sword_stand(8, 28)
 	gen_poe(57.5,10.5)
+	gen_skelly(7,23)
 	gen_enemies()
 
 	scene_actors["overworld"] = actors
@@ -129,10 +130,13 @@ function scene_init(prev_marker)
 	local y = 0
 
 	if marker == "boss" then
+		music(-1)
+		music(53)
 		x = offw + 16
 		y = 30.5
 	elseif marker == "overworld" then
-		music(0)
+		music(-1)
+		music(14)
 		if prev_marker == "hut" then
 			x = 8
 			y = 5.5
@@ -141,6 +145,8 @@ function scene_init(prev_marker)
 			y = 5.5
 		end
 	elseif marker == "hut" then
+		music(-1)
+		music(63)
 		if prev_marker == "title" then
 			pl.visible = true
 			x = offw + 2.5
@@ -153,6 +159,8 @@ function scene_init(prev_marker)
 			y = 32 + 4.5
 		end
 	elseif marker == "title" then
+		music(-1)
+		music(0)
 		pl.visible = false
 	end
 
@@ -224,6 +232,7 @@ function make_triggers()
 	triggers["gan_intro"].func =
 		function()
 			tbox("cannondwarf", "mwahahahahahahahahahaha. did you think you could defeat me?")
+			sfx(59)
 			triggers["gan_intro"].finished=true
 		end
 end
@@ -256,7 +265,7 @@ end
 function title_update()
 	if btnp(4) then
 		marker = "hut"
-		sfx(30)
+		--sfx(30)
 	end
 end
 
@@ -317,6 +326,10 @@ function make_actor(x, y)
 	a.good = false
 	a.bad  = false
 
+	-- if this number is higher than zero, then the move function won't be
+	-- called for your sprite until the timer goes down.
+	a.stun  = 0
+
 	-- if false, then the draw function for the sprite is not called.
 	a.visible=true
 
@@ -346,7 +359,7 @@ function make_actor(x, y)
 	a.inertia = 0.6
 
 	-- if 1, then no loss of speed when you bounce.
-	a.bounce  = .8
+	a.bounce  = 1
 
 	-- if false, then object is removed from the actors.
 	a.alive = true
@@ -470,16 +483,11 @@ end
 -- calls the hit function for both actors, if the opposing actor can hurt
 -- things.
 function hurt_actors(a1,a2)
-	if a2.hurt  then
-		a1.hit(a2)
-	end
-
-	if a1.hurt then
-		a2.hit(a1)
-	end
+	a1.hit(a2)
+	a2.hit(a1)
 end
 
--- a helper function for move_actor
+-- a helper function for set_actor_physics
 -- returns the new speeds.
 function move_actor_check(a, dx, dy)
 	if not touching_wall(a, dx, dy) then
@@ -508,17 +516,36 @@ function move_actor_check(a, dx, dy)
 	return dx + dy
 end
 
-function move_actor(a)
+
+function move_actors()
+	-- first set all actor's speed.
+	foreach(actors, set_actor_speed)
+
+	-- then set all of their coordinates.
+	foreach(actors, set_actor_physics)
+end
+
+function set_actor_speed(a)
 	if a.is_outside then
 		return
 	end
 
 	if a.move != nil then
-		a.move(a)
-	end
+		if a.stun <= 0 then
+			a.move(a)
+		else
+			a.stun -= 1
+		end
 
 	a.dx = move_actor_check(a, a.dx, 0)
 	a.dy = move_actor_check(a, 0, a.dy)
+	end
+end
+
+function set_actor_physics(a)
+	if a.is_outside then
+		return
+	end
 
 	-- apply inertia
 	-- set dx,dy to zero if you
@@ -536,7 +563,6 @@ function move_actor(a)
 	a.frame %= a.frames
 
 	a.t += 1
-	
 end
 
 function control_player(pl)
@@ -548,12 +574,30 @@ function control_player(pl)
 		if btn(1) then pl.dx += accel end
 		if btn(2) then pl.dy -= accel end
 		if btn(3) then pl.dy += accel end
+	elseif btn(4) then
+		if pl.sword == nil and pl.has_sword then
+			local dir = -1
+			if btn(0) then     dir = 0
+			elseif btn(1) then dir = 1
+			elseif btn(2) then dir = 2
+			elseif btn(3) then dir = 3 end
+
+			if dir != -1 then pl.sword=gen_sword(pl.x, pl.y, dir, false) end
+		end
 	elseif btn(5) then
-		if pl.sword == nil then
-			if btnp(0) then     pl.sword=gen_sword(pl.x, pl.y, 0, false)
-			elseif btnp(1) then pl.sword=gen_sword(pl.x, pl.y, 1, false)
-			elseif btnp(2) then pl.sword=gen_sword(pl.x, pl.y, 2, false)
-			elseif btnp(3) then pl.sword=gen_sword(pl.x, pl.y, 3, false) end
+		if pl.boomerang == nil and pl.has_boomerang then
+			local dir = -1
+
+			if btn(0) and btn(2)     then dir = 4
+			elseif btn(1) and btn(2) then dir = 5
+			elseif btn(1) and btn(3) then dir = 6
+			elseif btn(0) and btn(3) then dir = 7
+			elseif btn(0) then dir = 0
+			elseif btn(1) then dir = 1
+			elseif btn(2) then dir = 2
+			elseif btn(3) then dir = 3 end
+
+			if dir != -1 then pl.boomerang=gen_boomerang(pl.x, pl.y, dir) end
 		end
 	end
 
@@ -574,6 +618,7 @@ function gen_chest(x,y)
 	chest.open=
 		function()
 			tbox("", "you opened a chest")
+			sfx(62)
 		end
 
 	chest.move=
@@ -590,6 +635,110 @@ function gen_chest(x,y)
 			end
 		end
 	return chest
+end
+
+function gen_boomerang(x, y, dir)
+	local time = 15
+	local spd = .4
+	local hs = 0
+	local vs = 0
+
+	local boom = make_actor(x, y)
+
+	boom.spr = 54
+	boom.radx = 30 -- used for move to player
+	boom.rady = 30 -- used for move to player
+	boom.solid = false
+	boom.touchable = false
+	boom.hurt = true
+	boom.inertia = 0
+	boom.collection = {}
+
+	-- updates the position of the things the boomerang collected.
+	update_collection = function()
+		foreach(boom.collection,
+			function(item)
+				item.x = boom.x + boom.dx
+				item.y = boom.y + boom.dy
+				item.dx = boom.dx
+				item.dy = boom.dy
+			end)
+		end
+
+	-- When the boomerang collects a power orb.
+	boom.collect=
+		function(other)
+			add(boom.collection, other)
+		end
+
+	if dir == 0 or dir == 4 or dir == 7 then
+		hs = -spd
+	elseif dir == 1 or dir == 5 or dir == 6 then
+		hs = spd
+	end
+
+	if dir == 2 or dir == 4 or dir == 5 then
+		vs = -spd
+	elseif dir == 3 or dir == 6 or dir == 7 then
+		vs = spd
+	end
+
+	boom.dx = hs
+	boom.dy = vs
+	
+	boom.move=
+		function(self)
+			if self.t >= time then
+				move_to_player(boom, spd)
+			else
+				boom.dx = hs
+				boom.dy = vs
+			end
+
+			update_collection()
+		end
+
+	boom.draw=
+		function(self)
+			local num = flr(self.t / 4) % 4
+			local fx = false
+			local fy = false
+			if num == 0 then
+				fx = true
+				fy = true
+			elseif num == 1 then
+				fx = true
+				fy = false
+			elseif num == 2 then
+				fx = false
+				fy = false
+			elseif num == 3 then
+				fx = false
+				fy = true
+			end
+			draw_actor(self, nil, nil, fx, fy)
+		end
+
+	boom.hit=
+		function(other)
+			if other == pl then
+				boom.alive = boom.t < time
+				-- if the boomerang is finished, then make sure the orb touches as well.
+				--if not boom.alive then
+					--update_collection()
+				--end
+			elseif other.bad and other.solid and other.touchable then
+				boom.t = time
+			end
+
+		end
+
+	boom.destroy =
+		function(self)
+			pl.boomerang = nil
+		end
+
+	return boom
 end
 
 function gen_sword(x, y, dir, master)
@@ -775,7 +924,7 @@ end
 
 function map_update()
 	if pl.alive then
-		foreach(actors, move_actor)
+		move_actors()
 	end
 
 	-- call outside and destroy functions
@@ -899,9 +1048,12 @@ function gen_link(x, y)
 	pl.move = control_player
 	pl.hearts = 3
 	pl.hurt=true
-	pl.good=true
-	pl.bounce=.3
-	pl.sword=nil
+	--pl.good=false
+	pl.has_sword=true -- if false, then link can't use his sword.
+	pl.sword=nil      -- used to regulate only one sword.
+
+	pl.has_boomerang=true -- if false, then link can't use his sword.
+	pl.boomerang=nil      -- used to regulate only one sword.
 
 	pl.hit=function(other)
 		if other.bad then
@@ -916,7 +1068,8 @@ function gen_link(x, y)
 	end
 
 	pl.destroy=function(other)
-		music(14)
+		music(-1)
+		music(41)
 	end
 
 	return pl
@@ -944,11 +1097,18 @@ function gen_power_orb(x, y)
 	local orb = make_actor(x, y)
 	orb.spr = 55
 	orb.touchable = false
+	orb.solid = false
+	orb.inertia = 0
+	orb.hit_boom = false
+
 	-- use a closure!
 	orb.hit=
 		function(other)
 			if other == pl then
 				orb.alive = false
+			elseif other == pl.boomerang then
+				orb.hit_boom = true
+				other.collect(orb)
 			end
 		end
 
@@ -974,6 +1134,9 @@ function gen_enemy(x, y)
 	bad.move = function(self) end
 	bad.hit=
 		function(other)
+			if other == pl.boomerang then
+				bad.stun = 30
+			end
 			if other.good then
 				bad.alive = false
 			end
@@ -1076,7 +1239,7 @@ end
 function gen_skelly(x, y)
 	local bad = gen_enemy(x, y)
 	bad.spr = 68
-	bad.move = move_to_player
+	bad.move = function(self) move_to_player(self, .1) end
 	return bad
 end
 
@@ -1121,11 +1284,10 @@ function move_horizontal(a)
 	a.dx = a.radx * cos(a.t / slow) / 30
 end
 
-function move_to_player(a)
-	local slow = 2
+function move_to_player(a, spd)
 	local ang = atan2(pl.x - a.x, pl.y - a.y)
-	a.dx = a.radx * cos(ang) / 30 / slow
-	a.dy = a.rady * sin(ang) / 30 / slow
+	a.dx = spd * cos(ang)
+	a.dy = spd * sin(ang)
 end
 
 function move_from_player(a)
@@ -1313,10 +1475,10 @@ function tbox_draw()
 
 		-- print the message
 		if tbox_messages[1] != nil and tbox_messages[1].animation<#tbox_messages[1].line then
-			sfx(0)
+			--sfx(0)
 			tbox_messages[1].animation+=1
 		elseif tbox_messages[2] != nil and tbox_messages[2].animation<#tbox_messages[2].line then
-			sfx(0)
+			--sfx(0)
 			tbox_messages[2].animation+=1
 		end
 			
@@ -1364,14 +1526,14 @@ d006700d0d6d566d66d566d00666666011cccccccccccc1153535353545454540655555655566550
 000670000d6d566d66d566d0702882071ccccccccccccc14cccccccc54454454770000444455545009999440f1f676f14d66666f039900000000993040000004
 000670000d6d566d66d566d07702207711cccccccccccc11cccccccc54454454777770000044440004444440f1dd9dd1fdffffff033300000000333044444444
 000070000d6d566d66d566d07777777731ccccccccccccc1cccccccc54454454777777007000000700000000fff404fff11fffff000000000000000044444444
-777770000d6d566d66d566d02888e9aaaaaaaaaaaa9e88827777557777777777ffff5fffffffffff000000000005000050575005757775077777770777777757
-077700000d6d566d66d566d0228e99eaaaaaaaaaae99e8227705507777000077fff575fff11fffff000000000000000550505007757075077770775777757777
-007000000d6d566d66d566d02888e9aaaaaaaaaaaa9e888270151107705cc507fff575fffdffffff000000000000500055507500777077507775777077777775
-000000000dd5556d6d5556d0228e99eaaaaaaaaaae99e8227011110770c66c07fff575ff2d55555f000000005050000075700500777507507777077577775777
-000000000d6d566d66d566d02888e9aaaaaaaaaaaa9e88827011110770c66c07fff575ff0d777775000000000000000005000550070507750707577757577777
-000000000d6d566d66d566d0228e99eaaaaaaaaaae99e82270111107705cc507f1f575f12d55555f000000000500050007050750070757755757777777777777
-000000000d6d566d66d566d02888e9aaaaaaaaaaaa9e88827700007777000077f1ddddd1fdffffff000000000000000000050055505750777077707775777577
-000000000000000000000000228e99eaaaaaaaaaae99e8227777777777777777fff202fff11fffff000000000000005000055075505770777577757777777777
+777770000d6d566d66d566d02888e9aaaaaaaaaaaa9e8882aeaaaaaa77777777ffff5fffffffffff000000000005000050575005757775077777770777777757
+077700000d6d566d66d566d0228e99eaaaaaaaaaae99e822eee9995577000077fff575fff11fffff000000000000000550505007757075077770775777757777
+007000000d6d566d66d566d02888e9aaaaaaaaaaaa9e8882ae555577705cc507fff575fffdffffff000000000000500055507500777077507775777077777775
+000000000dd5556d6d5556d0228e99eaaaaaaaaaae99e822a957777770c66c07fff575ff2d55555f000000005050000075700500777507507777077577775777
+000000000d6d566d66d566d02888e9aaaaaaaaaaaa9e8882a957777770c66c07fff575ff0d777775000000000000000005000550070507750707577757577777
+000000000d6d566d66d566d0228e99eaaaaaaaaaae99e822a9577777705cc507f1f575f12d55555f000000000500050007050750070757755757777777777777
+000000000d6d566d66d566d02888e9aaaaaaaaaaaa9e8882a577777777000077f1ddddd1fdffffff000000000000000000050055505750777077707775777577
+000000000000000000000000228e99eaaaaaaaaaae99e822a577777777777777fff202fff11fffff000000000000005000055075505770777577757777777777
 005777755777750000000000000000006655557777944977773b3b37777777770000000000000000000000000000777777770000000000777777700000007777
 05475574470674500606060606060600650660577744447773b3b3b3777707770eeeeeeeeeeeee0eeeeeeee00ee0777777770eeeeeeee00777770eeeeeee0777
 0547777447777450065656565656565065666657722222277b35353b7700407700888888888888088888888e0880777777770888888888007770888888888077

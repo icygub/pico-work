@@ -1,0 +1,58 @@
+## Alan Morgan - Zeldo Script
+
+scene 1 - opening
+	I = ivan
+	L = lank
+
+	I = hey! listen!
+	I =  Wake up lank.
+	L = ...
+	I = lank, princess zeldo is being held captive be cannondwarf! you gotta rescue her!
+	L = who are you?
+	I = i'm your fairy
+	L = oh, okay.
+
+scene 2 - walk outside house
+	I = look! it's a chest.  Try pressing z near it.
+	L = but it's not mine..
+	I = nevermind that. you're just borrowing it.
+	L = well, I guess I can give it back later.
+	you got a boomerang you can now stun enemies boomerangs stun enemies. hold x then press an arrow key to use it.
+
+ivan: hey lank, talk to that man.
+old man blocks sacred grove entrance.
+old man: a powerful sword along with powerful enemies lie beyond here.
+old man: come back when you've collected 50 power orbs.
+
+ivan: hey! listen!
+ivan: lank, do you know what a power orb is?
+lank: no
+ivan: that is what you get when you kill monster.
+lank: so I have to kill a monster.
+ivan: you have to kill 50 to get the master sword.
+lank: i've never killed anything before though.
+ivan: lank, if we don't defeat these monsters, candwarf will take over all of hiroll.
+lank: alright, i can do this!
+
+shop - exchange power orbs for an item.
+sword           - 49 power orbs
+speed upgrade   - 50 power orbs
+heart container - 50 power orbs
+fairy           - 50 power orbs
+
+enter candwarf's layer
+chest with power orbs next to zelda's cage.
+zeldo: lank, it's a trap don't listen to-
+candwarf: silence princess!
+candwarf: you! how dare you enter my lair. suffer my wrath.
+ivan: we can't beat him yet, let's take whatever's in that chest and ditch.
+
+open the chest
+you got 49 power orbs
+
+lank: i still feel bad taking people's stuff.
+ivan: hey if you didn't take those power orbs, candwarf would have used them for evil.
+lank: i guess you're right.
+
+candwarf: you have returned. let's continue our duel.
+zeldo: ...

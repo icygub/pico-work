@@ -320,9 +320,7 @@ function make_actor(x, y)
 	-- but the hit function will still be called.
 	a.touchable=true
 
-	-- if true, then you can hurt other actors.
-	-- but you can only hurt actors not on your team.
-	a.hurt = false
+	-- which side are you on?
 	a.good = false
 	a.bad  = false
 
@@ -359,7 +357,7 @@ function make_actor(x, y)
 	a.inertia = 0.6
 
 	-- if 1, then no loss of speed when you bounce.
-	a.bounce  = 1
+	a.bounce  = 0
 
 	-- if false, then object is removed from the actors.
 	a.alive = true
@@ -434,45 +432,45 @@ function update_outside()
 	end
 end
 
--- returns the actor that was hit. will return nil if this actor is out of
+-- returns a list of all actors hit. will return nil if none were hit.
+-- or if this is out of bounds.
 -- bounds. won't check for actors that are out of bounds.
 -- also does not work with overlapping actors.
 function actor_collision(a, dx, dy)
-	if a.is_outside then
-		return nil
-	end
+	local retlist = {}
 
-	for a2 in all(actors) do
-		if not a2.is_outside then
-			local x=(a.x+dx) - a2.x
-			local y=(a.y+dy) - a2.y
-			if ((abs(x) < (a.w+a2.w)) and
-				(abs(y) < (a.h+a2.h)))
-			then 
-				-- check if moving together
-				if (dx != 0 and abs(x) <
-						abs(a.x-a2.x)) then
-					if a.touchable and a2.touchable then
-						v=a.dx + a2.dy
-						if not a.static then a.dx = v/2 end
-						if not a2.static then a2.dx = v/2 end
+	if not a.is_outside then
+		for a2 in all(actors) do
+			if not a2.is_outside and a != a2 then
+				local x=(a.x+dx) - a2.x
+				local y=(a.y+dy) - a2.y
+				if ((abs(x) < (a.w+a2.w)) and
+					(abs(y) < (a.h+a2.h)))
+				then 
+					-- check if moving together
+					if (dx != 0 and abs(x) <
+							abs(a.x-a2.x)) then
+						if a.touchable and a2.touchable then
+							v=a.dx + a2.dy
+							if not a.static then a.dx = v/2 end
+							if not a2.static then a2.dx = v/2 end
+						end
+						add(retlist, a2)
+					elseif (dy != 0 and abs(y) <
+									abs(a.y-a2.y)) then
+						if a.touchable and a2.touchable then
+							v=a.dy + a2.dy
+							if not a.static then a.dy = v/2 end
+							if not a2.static then a2.dy = v/2 end
+						end
+						add(retlist, a2)
 					end
-					return a2
-				end
-				
-				if (dy != 0 and abs(y) <
-								abs(a.y-a2.y)) then
-					if a.touchable and a2.touchable then
-						v=a.dy + a2.dy
-						if not a.static then a.dy = v/2 end
-						if not a2.static then a2.dy = v/2 end
-					end
-					return a2
 				end
 			end
 		end
 	end
-	return nil
+
+	return retlist
 end
 
 -- checks just walls
@@ -480,32 +478,41 @@ function touching_wall(a, dx, dy)
 	return a.solid and solid_area(a.x+dx,a.y+dy, a.w,a.h)
 end
 
--- calls the hit function for both actors, if the opposing actor can hurt
--- things.
-function hurt_actors(a1,a2)
-	a1.hit(a2)
-	a2.hit(a1)
+-- calls the hit function for each actor touching a.
+function hit_actors(a,alist)
+	-- hits with the main actor.
+	for other in all(alist) do
+		a.hit(other)
+		other.hit(a)
+	end
 end
 
--- a helper function for set_actor_physics
--- returns the new speeds.
+-- existential function for touchable items.
+function has_touchable(actor_list)
+	for a in all(actor_list) do
+		if a.touchable then
+			return true
+		end
+	end
+	return false
+end
+
+-- figures out speed for collisions or doesn't change the speed.
+-- and hurts the actors.
 function move_actor_check(a, dx, dy)
 	if not touching_wall(a, dx, dy) then
-		local other = actor_collision(a, dx, dy) 
-		if other != nil then
-			hurt_actors(a,other)
-			if other.touchable and a.touchable then
+		local other_list = actor_collision(a, dx, dy) 
+
+		if #other_list != 0 then
+			hit_actors(a,other_list)
+
+			if a.touchable and has_touchable(other_list) then
 				dx *= -a.bounce
 				dy *= -a.bounce
 				-- sfx(2)
-			else
-				a.x += dx
-				a.y += dy
 			end
-		else
-			a.x += dx
-			a.y += dy
 		end
+
 	else   
 		-- otherwise bounce
 		dx *= -a.bounce
@@ -522,7 +529,7 @@ function move_actors()
 	foreach(actors, set_actor_speed)
 
 	-- then set all of their coordinates.
-	foreach(actors, set_actor_physics)
+	foreach(actors, set_actor_pos)
 end
 
 function set_actor_speed(a)
@@ -542,14 +549,14 @@ function set_actor_speed(a)
 	end
 end
 
-function set_actor_physics(a)
+function set_actor_pos(a)
 	if a.is_outside then
 		return
 	end
 
-	-- apply inertia
-	-- set dx,dy to zero if you
-	-- don't want inertia
+	-- update the position then apply inertia.
+	a.x += a.dx
+	a.y += a.dy
 
 	a.dx *= a.inertia
 	a.dy *= a.inertia
@@ -557,7 +564,6 @@ function set_actor_physics(a)
 	-- advance one frame every
 	-- time actors moves 1/4 of
 	-- a tile
-	
 	a.frame += abs(a.dx) * 4
 	a.frame += abs(a.dy) * 4
 	a.frame %= a.frames
@@ -603,6 +609,7 @@ function control_player(pl)
 
 	-- play a sound if moving
 	-- (every 4 ticks)
+	if pl.regenerate > 0 then pl.regenerate -= 1 end
 	
 	if (abs(pl.dx)+abs(pl.dy) > 0.1
 					and (pl.t%4) == 0) then
@@ -650,7 +657,6 @@ function gen_boomerang(x, y, dir)
 	boom.rady = 30 -- used for move to player
 	boom.solid = false
 	boom.touchable = false
-	boom.hurt = true
 	boom.inertia = 0
 	boom.collection = {}
 
@@ -658,16 +664,18 @@ function gen_boomerang(x, y, dir)
 	update_collection = function()
 		foreach(boom.collection,
 			function(item)
-				item.x = boom.x + boom.dx
-				item.y = boom.y + boom.dy
 				item.dx = boom.dx
 				item.dy = boom.dy
 			end)
 		end
 
-	-- When the boomerang collects a power orb.
+	-- when the boomerang collects a power orb.
 	boom.collect=
 		function(other)
+			other.x = boom.x
+			other.y = boom.y
+			other.dx = boom.dx
+			other.dy = boom.dy
 			add(boom.collection, other)
 		end
 
@@ -722,11 +730,12 @@ function gen_boomerang(x, y, dir)
 	boom.hit=
 		function(other)
 			if other == pl then
-				boom.alive = boom.t < time
-				-- if the boomerang is finished, then make sure the orb touches as well.
-				--if not boom.alive then
-					--update_collection()
-				--end
+				if boom.t >= time then
+					boom.alive = false
+					for a in all(boom.collection) do
+						a.alive = false
+					end
+				end
 			elseif other.bad and other.solid and other.touchable then
 				boom.t = time
 			end
@@ -784,7 +793,6 @@ function gen_sword(x, y, dir, master)
 	sword.solid = false
 	sword.touchable = false
 	sword.good = true
-	sword.hurt = true
 	sword.dir = dir
 	sword.destroy =
 		function(self)
@@ -1047,18 +1055,39 @@ function gen_link(x, y)
 	pl.solid = true
 	pl.move = control_player
 	pl.hearts = 3
-	pl.hurt=true
-	--pl.good=false
+	pl.draw =
+		function(self)
+			shake(true)
+			if pl.regenerate > 0 then
+				shake()
+				if pl.t % 10 < 3 then return end
+			end
+			draw_actor(self)
+		end
+	
+	pl.max_hearts = 3
+
+	pl.heal =
+		function()
+			if pl.hearts < pl.max_hearts then
+				pl.hearts += 1
+			end
+		end
+
+	pl.bounce = 0
+	pl.good=false
 	pl.has_sword=true -- if false, then link can't use his sword.
 	pl.sword=nil      -- used to regulate only one sword.
+	pl.regenerate=0
 
 	pl.has_boomerang=true -- if false, then link can't use his sword.
 	pl.boomerang=nil      -- used to regulate only one sword.
 
 	pl.hit=function(other)
-		if other.bad then
-			if pl.hearts > 0 then
+		if other.bad and other.stun == 0 then
+			if pl.hearts > 0 and pl.regenerate == 0 then
 				pl.hearts = pl.hearts - 1
+				pl.regenerate = 30
 			end
 	
 			if pl.hearts == 0 then
@@ -1093,24 +1122,42 @@ function gen_enemies()
 	end
 end
 
-function gen_power_orb(x, y)
-	local orb = make_actor(x, y)
-	orb.spr = 55
-	orb.touchable = false
-	orb.solid = false
-	orb.inertia = 0
-	orb.hit_boom = false
+function gen_collectable(x, y)
+	local collectable = make_actor(x, y)
+	collectable.hit_boom = false
+	collectable.inertia = 0
+	collectable.touchable = false
+	collectable.solid = false
 
 	-- use a closure!
-	orb.hit=
+	collectable.hit=
 		function(other)
-			if other == pl then
-				orb.alive = false
-			elseif other == pl.boomerang then
-				orb.hit_boom = true
-				other.collect(orb)
+			-- only collision with player if not hit boomerang.
+			if other == pl and not collectable.hit_boom then
+				collectable.alive = false
+			elseif other == pl.boomerang and not collectable.hit_boom then
+				collectable.hit_boom = true
+				other.collect(collectable)
 			end
 		end
+
+	return collectable
+end
+
+function gen_heart(x,y)
+	local heart = gen_collectable(x,y)
+	heart.spr = 35
+
+	heart.destroy =
+		function(self)
+			pl.heal()
+		end
+	return heart
+end
+
+function gen_power_orb(x, y)
+	local orb = gen_collectable(x,y)
+	orb.spr = 55
 
 	orb.destroy =
 		function(self)
@@ -1125,7 +1172,6 @@ function gen_enemy(x, y)
 	bad.dx=0
 	bad.dy=0
 	bad.inertia=.5
-	bad.hurt=true
 	bad.bad=true
 	bad.hearts=0
 	bad.radx = 5
@@ -1137,6 +1183,7 @@ function gen_enemy(x, y)
 			if other == pl.boomerang then
 				bad.stun = 30
 			end
+
 			if other.good then
 				bad.alive = false
 			end
@@ -1144,9 +1191,16 @@ function gen_enemy(x, y)
 
 	bad.destroy =
 		function(self)
-			orb = gen_power_orb(bad.x, bad.y)
-			orb.dx = bad.dx*3
-			orb.dy = bad.dy*3
+			local col = nil
+			-- smaller chance you get a heart.
+			if dice_roll(5) then
+				col = gen_heart(bad.x, bad.y)
+			else
+				col = gen_power_orb(bad.x, bad.y)
+			end
+			
+			col.dx = bad.dx*3
+			col.dy = bad.dy*3
 		end
 
 	-- enemy faces player, assumes sprite is facing left
@@ -1189,6 +1243,7 @@ function gen_deku_bullet(x,y,dx,dy)
 	bad.spr = 71
 	bad.dx = dx
 	bad.dy = dy
+	bad.bad = true
 	bad.inertia=1
 	bad.solid=false
 	bad.touchable=false
@@ -1240,6 +1295,7 @@ function gen_skelly(x, y)
 	local bad = gen_enemy(x, y)
 	bad.spr = 68
 	bad.move = function(self) move_to_player(self, .1) end
+	bad.inertia = 0
 	return bad
 end
 
@@ -1498,8 +1554,17 @@ function tbox_draw()
 	end
 end
 
+------------------------------------------------------------------------------
+-- screen shake implementation, taken from https://github.com/jessemillar/pico-8
+-- slightly modified
+------------------------------------------------------------------------------
+function shake(reset) -- shake the screen
+	camera(0,0) -- reset to 0,0 before each shake so we don't drift
 
-
+	if not reset then -- if the param is true, don't shake, just reset the screen to default
+		camera(flr(rnd(2)-1),flr(rnd(2)-1)) -- define shake power here (-1 to shake equally in all directions)
+	end
+end
 
 __gfx__
 00000000330000333333333333333333555555555d55555555555555400004445445455444444444000000000221022102110211444422222222444422442422
@@ -1521,10 +1586,10 @@ d006700d0d6d566d66d566d00666666011cccccccccccc1153535353545454540655555655566550
 000670000d6d566d66d566d077777777331cccccccccccc1cccccccc54454454065555555555455000000000ffff6fffffffffff039990000009993008888880
 000670000d6d566d66d566d072277227331cccccccccccc1cccccccc54454454065555555555555004444440fff676fff11fffff039990000009993008888880
 000670000d6d566d66d566d028800882311cccccccccccc1cccccccc54454454005555555555556004499990fff676fffdffffff039900000000993008888880
-000670000dd5556d6d5556d02888888211cccccccccccc11cccccccc54454454700455555555564004499440fff676ff4d66666f039900000000993008888880
-000670000dd5556d6d5556d0728888271ccccccccccccc14cccccccc54454454700444566555565004499440fff676ff09777776039900000000993008888880
-000670000d6d566d66d566d0702882071ccccccccccccc14cccccccc54454454770000444455545009999440f1f676f14d66666f039900000000993040000004
-000670000d6d566d66d566d07702207711cccccccccccc11cccccccc54454454777770000044440004444440f1dd9dd1fdffffff033300000000333044444444
+000670000dd5556d6d5556d00888888011cccccccccccc11cccccccc54454454700455555555564004499440fff676ff4d66666f039900000000993008888880
+000670000dd5556d6d5556d0708888071ccccccccccccc14cccccccc54454454700444566555565004499440fff676ff09777776039900000000993008888880
+000670000d6d566d66d566d0770880771ccccccccccccc14cccccccc54454454770000444455545009999440f1f676f14d66666f039900000000993040000004
+000670000d6d566d66d566d07770077711cccccccccccc11cccccccc54454454777770000044440004444440f1dd9dd1fdffffff033300000000333044444444
 000070000d6d566d66d566d07777777731ccccccccccccc1cccccccc54454454777777007000000700000000fff404fff11fffff000000000000000044444444
 777770000d6d566d66d566d02888e9aaaaaaaaaaaa9e8882aeaaaaaa77777777ffff5fffffffffff000000000005000050575005757775077777770777777757
 077700000d6d566d66d566d0228e99eaaaaaaaaaae99e822eee9995577000077fff575fff11fffff000000000000000550505007757075077770775777757777

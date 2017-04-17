@@ -36,7 +36,6 @@ lank: alright, i can do this!
 
 shop - exchange power orbs for an item.
 sword           - 49 power orbs
-speed upgrade   - 50 power orbs
 heart container - 50 power orbs
 fairy           - 50 power orbs
 

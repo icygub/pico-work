@@ -5,6 +5,185 @@ __lua__
 
 marker = "sacred"  -- where you are in the story, start on title screen.
 
+function make_lost_woods(path_len)
+	actors = {}
+	gen_sign(100.5,46.5, "don't get lost!")
+
+	scene_actors[get_lost_name(1)] = actors
+	actors = {}
+
+	for i=2, path_len do
+		gen_lost_actors(i, path_len)
+	end
+
+	local path = make_lost_path(path_len)
+	lost_woods_triggers(path)
+end
+
+function gen_lost_actors(path_num, path_len)
+	actors = {}
+
+	gen_skelly(102,50)
+
+	scene_actors[get_lost_name(path_num)] = actors
+	actors = {}
+end
+
+-- returns the list of path directions.
+function make_lost_path(path_len)
+	-- can't have a path that allows you to go right then left.
+	-- if 0 then 0 or 1. if 2 then 1 or 2.
+	local lost_woods_path = {}
+	local prev_num = 1
+
+	for i=1, path_len-1 do
+		local new_num = 1
+
+		if prev_num == 0 then
+			new_num = flr(rnd(2))
+		elseif prev_num == 1 then
+			new_num = flr(rnd(3))
+		else -- must be 2
+			new_num = flr(rnd(2)) + 1
+		end
+			
+		add(lost_woods_path, new_num)
+		prev_num = new_num
+	end
+
+	add(lost_woods_path, 1)
+	return lost_woods_path
+end
+
+-- a utility function to make a trigger in one of the three lost woods directions
+-- used in make_wrong_exit, make_right_exit, and make_final_exit.
+-- 0 = left, 1 = up, 2 = right
+function make_lost_dir_trigger(str, dir)
+	if dir == 0 then
+		make_trigger(str, 96, 48, 97, 52, {x=106.5, y=50})
+	elseif dir == 1 then
+		make_trigger(str, 100, 44, 104, 45, {x=102, y=54.5})
+	else -- dir is 2
+		make_trigger(str, 107, 48, 108, 52, {x=97.5, y=50})
+	end
+	triggers[str].active = false
+end
+
+function get_lost_name(room_num)
+	return "lost_woods_"..room_num
+end
+
+function get_lost_right_name(room_num)
+	return "lost_woods_"..room_num.."_right"
+end
+
+function get_lost_wrong1_name(room_num)
+	return "lost_woods_"..room_num.."_wrong_1"
+end
+
+function get_lost_wrong2_name(room_num)
+	return "lost_woods_"..room_num.."_wrong_2"
+end
+
+-- pass in true to make the room active, or false to make it inactive.
+function toggle_lost_room_str(room_name, active)
+	local str1 = room_name.."_wrong_1"
+	local str2 = room_name.."_wrong_2"
+	local str3 = room_name.."_right"
+
+	triggers[str1].active = active
+	triggers[str2].active = active
+	triggers[str3].active = active
+end
+
+function toggle_lost_room(room_num, active)
+	local str1 = get_lost_wrong1_name(room_num)
+	local str2 = get_lost_wrong2_name(room_num)
+	local str3 = get_lost_right_name(room_num)
+
+	if room_num > 0 then
+		triggers[str1].active = active
+		triggers[str2].active = active
+		triggers[str3].active = active
+	end
+end
+
+-- switches the triggers. if either are 0, then nothing happens for that one.
+function switch_lost_room(cur_num, nxt_num)
+	toggle_lost_room(cur_num, false)
+	toggle_lost_room(nxt_num, true)
+	marker = get_lost_name(nxt_num)
+end
+
+-- there are only two wrongs. 1 and 2.
+function make_wrong_exits(path_num, dir1, dir2)
+	local str1 = get_lost_wrong1_name(path_num)
+	local str2 = get_lost_wrong2_name(path_num)
+
+	make_lost_dir_trigger(str1, dir1)
+	make_lost_dir_trigger(str2, dir2)
+
+	local reset_func=
+		function()
+			-- go to the first lost room.
+			switch_lost_room(path_num, 1)
+		end
+
+	triggers[str1].func = reset_func
+	triggers[str2].func = reset_func
+end
+
+function make_right_exit(path_num, dir)
+	local str = get_lost_right_name(path_num)
+	local nxt = get_lost_name(path_num+1)
+	make_lost_dir_trigger(str, dir)
+
+	triggers[str].func =
+		function()
+			-- go to next room
+			switch_lost_room(path_num, path_num+1)
+		end
+end
+
+function make_final_exit(path_num, dir)
+	local str = get_lost_right_name(path_num)
+	make_lost_dir_trigger(str, dir)
+	triggers[str].pos = {x=118,y=54.5}
+
+	triggers[str].func =
+		function()
+			-- get rid of last one and enable first one.
+			toggle_lost_room(path_num, false)
+			toggle_lost_room(1, true)
+			marker = "sacred"
+		end
+end
+
+-- assumes the items in lost woods path are a 0, 1, or 2
+function lost_woods_triggers(lost_woods_path)
+	local str_exit = "lost_woods_exit"
+	make_trigger(str_exit, 100,  55, 104,  56, {x=32, y=1.5})
+	triggers[str_exit].func =
+		function()
+			toggle_lost_room_str(marker, false)
+			toggle_lost_room(1, true)
+			marker = "overworld"
+		end
+
+	-- the keys are indexes like an array
+	for k,v in pairs(lost_woods_path) do
+		if k == #lost_woods_path then
+			make_final_exit(k, v)
+		else
+			make_right_exit(k, v)
+		end
+
+		make_wrong_exits(k, (v+1)%3, (v+2)%3)
+	end
+
+	toggle_lost_room(1, true) -- make the first lost room enabled at the start.
+end
+
 function make_map()
 	actors = {}
 
@@ -41,34 +220,23 @@ end
 
 function make_triggers()
 	-- trigger positions
-	make_trigger("hut_enter",   7,    4.5,   9,    5.5)
-	make_trigger("hut_exit",    97,   37,    100,  38)
+	make_trigger("no_sword",    7,    10,    9,    12)
 	make_trigger("no_sword",    7,    10,    9,    12)
 	make_trigger("gan_intro",   108,  1,     116,  9)
-	make_trigger("old_enter",   15,   47.5,  17,   48.5)
-	make_trigger("old_exit",    97,   43,    100,  44)
 	make_trigger("steal"   ,    97,   39,    100,  42)
 	make_trigger("hut_start",   97,   33,    100,  36)
-	make_trigger("boss_enter",  87,   3,     89,   4.5)
-	make_trigger("boss_exit",   109,  32,    115,  33)
-	make_trigger("shop_enter",  29,   55.5,  31,   56.5)
-	make_trigger("shop_exit",   104,  43,    109,  44)
-	make_trigger("sacred_exit", 116,  55,    120,  56)
 
-	-- trigger functions
-	triggers["hut_enter"].func = function() marker="hut" end
-	triggers["hut_exit"].func = function() marker="overworld" end
+	make_trigger("hut_enter",    7,    4.5,   9,    5.5,  {x=98.5,    y=36.5}, "hut")
+	make_trigger("old_enter",    15,   47.5,  17,   48.5, {x=98.5,    y=42.5}, "old")
+	make_trigger("boss_enter",   87,   3,     89,   4.5,  {x=offw+16, y=30.5}, "boss")
+	make_trigger("shop_enter",   29,   55.5,  31,   56.5, {x=106.5,   y=42.5}, "shop")
+	make_trigger("lost_enter",   31,   0,     33,   1,    {x=102,     y=54.5}, get_lost_name(1))
 
-	triggers["old_enter"].func = function() marker="old" end
-	triggers["old_exit"].func = function() marker="overworld" end
-
-	triggers["boss_enter"].func = function() marker="boss" end
-	triggers["boss_exit"].func = function() marker="overworld" end
-
-	triggers["shop_enter"].func = function() marker="shop" end
-	triggers["shop_exit"].func = function() marker="overworld" end
-
-	triggers["sacred_exit"].func = function() marker="overworld" end
+	make_trigger("hut_exit",    97,   37,    100,  38,   {x=8,    y=5.5},  "overworld")
+	make_trigger("old_exit",    97,   43,    100,  44,   {x=16,   y=48.5}, "overworld")
+	make_trigger("boss_exit",   109,  32,    115,  33,   {x=87.5, y=4.5},  "overworld")
+	make_trigger("shop_exit",   104,  43,    109,  44,   {x=29.5, y=56.5}, "overworld")
+	make_trigger("sacred_exit", 116,  55,    120,  56,   {x=32.5, y=1.5},  "overworld")
 
 	triggers["hut_start"].func =
 		function()
@@ -79,7 +247,7 @@ function make_triggers()
 			tbox("lank", "who are you?")
 			tbox("ivan", "i'm your fairy")
 			tbox("lank", "oh, okay.")
-			triggers["hut_start"].finished=true
+			triggers["hut_start"].active=false
 		end
 
 	triggers["steal"].func =
@@ -89,20 +257,20 @@ function make_triggers()
 			tbox("ivan", "nevermind that. you're just borrowing it.")
 			tbox("lank", "well, i guess i could give it back later.")
 			
-			triggers["steal"].finished=true
+			triggers["steal"].active=false
 		end
 
 	triggers["no_sword"].func =
 		function()
 			tbox("ivan", "hey, listen! you don't have a sword yet! how can you save zeldo like this?")
-			triggers["no_sword"].finished=true
+			triggers["no_sword"].active=false
 		end
 
 	triggers["gan_intro"].func =
 		function()
 			tbox("cannondwarf", "mwahahahahahahahahahaha. did you think you could defeat me?")
 			sfx(59)
-			triggers["gan_intro"].finished=true
+			triggers["gan_intro"].active=false
 		end
 end
 
@@ -112,6 +280,7 @@ function make_scenes()
 	make_shop()
 	make_boss()
 	make_old()
+	make_lost_woods(2) -- how long the woods are
 	make_sacred()
 end
 
@@ -138,7 +307,7 @@ function make_sacred(prev_marker)
 			heart_container()
 		end)
 
-	gen_sword_stand(117.5, 38.5)
+	gen_sword_stand(118, 38.5)
 
 	scene_actors["sacred"] = actors
 	actors = {}
@@ -265,6 +434,7 @@ end
 function _draw()
 	scene_draw()
 	draw_triggers() -- debugging
+	print(marker, 50, 2, 7)
 end
 
 
@@ -291,12 +461,10 @@ end
 
 -- use when switching to a new scene.
 -- x and y are the player's new coordinates.
-function load_scene(scene_name, x, y)
+function load_scene(scene_name)
 	save_scene()
 	actors = scene_actors[scene_name]
 
-	if x != nil then pl.x = x end
-	if y != nil then pl.y = y end
 	view_update()
 
 	add(actors, pl)
@@ -310,33 +478,6 @@ function init_game()
 	gen_grass()
 end
 
--- just a helper function to scene init to minimize complexity.
-function mapOverworldPos(prev_marker)
-	local pos = {}
-	pos.x = 0
-	pos.y = 0
-	if prev_marker == "hut" then
-		pos.x = 8
-		pos.y = 5.5
-	elseif prev_marker == "old" then
-		pos.x = 16
-		pos.y = 48.5
-	elseif prev_marker == "title" then
-		pos.x = 8
-		pos.y = 5.5
-	elseif prev_marker == "shop" then
-		pos.x = 29.5
-		pos.y = 56.5
-	elseif prev_marker == "boss" then
-		pos.x = 87.5
-		pos.y = 4.5
-	elseif prev_marker == "sacred" then
-		pos.x = 32.5
-		pos.y = 1.5
-	end
-	return pos
-end
-
 -- gets called whenever the scene switches.
 function scene_init(prev_marker)
 	local x = 0
@@ -345,41 +486,24 @@ function scene_init(prev_marker)
 	if marker == "boss" then
 		music(-1)
 		music(53)
-		x = offw + 16
-		y = 30.5
 	elseif marker == "overworld" then
 		music(-1)
 		music(14)
-		local pos = mapOverworldPos(prev_marker)
-		x = pos.x
-		y = pos.y
 	elseif marker == "hut" then
 		music(-1)
 		music(63)
 		if prev_marker == "title" then
 			pl.visible = true
-			x = 98.5
-			y = 34
-		elseif prev_marker == "overworld" then
-			x = offw + 2.5
-			y = 36.5
+			pl.x = 98.5
+			pl.y = 34
 		end
-
 	elseif marker == "old" then
 		music(-1)
 		music(63)
-		if prev_marker == "overworld" then
-			x = 98.5
-			y = 42.5
-		end
-
 	elseif marker == "sacred" then
 		music(-1)
 		music(45)
-			x = 118
-			y = 54.5
 		-- just a filler song
-	
 	elseif marker == "title" then
 		music(-1)
 		music(0)
@@ -388,12 +512,9 @@ function scene_init(prev_marker)
 	elseif marker == "shop" then
 		music(-1)
 		music(63)
-
-		x = 106.5
-		y = 42.5
 	end
 
-	load_scene(marker, x, y)
+	load_scene(marker)
 end
 
 function scene_draw()
@@ -412,10 +533,13 @@ function scene_draw()
 	elseif marker == "old" then
 		draw_map(96, 38, 5, 5)
 	elseif marker == "sacred" then
-		draw_map(113, 33, 10, 22)
-		draw_wrap(0, 0, offw, offh)
+		draw_map (113, 33, 10, 22)
+		draw_wrap(113, 33, 10, 22)
 	elseif marker == "shop" then
 		draw_map(101, 33, 11, 10)
+	else -- assume lost woods
+		draw_map (97, 45, 10, 10)
+		draw_wrap(97, 45, 10, 10, 1)
 	end
 
 	draw_things()
@@ -443,8 +567,14 @@ function scene_update()
 end
 
 -- triggers are boxes you collide with that can make events happen.
-function make_trigger(name, x1, y1, x2, y2)
-	triggers[name] = {box={x1=x1, y1=y1, x2=x2, y2=y2}, finished=false, func=function() end}
+-- pos is where the player gets teleported to if the trigger is touched.
+function make_trigger(name, x1, y1, x2, y2, pos, mark)
+	local func=nil
+	if mark != nil then
+		func = function() marker=mark end
+	end
+
+	triggers[name] = {box={x1=x1, y1=y1, x2=x2, y2=y2}, active=true, pos=pos, func=func}
 end
 
 -- used for debugging purposes.
@@ -459,8 +589,12 @@ end
 
 function trigger_update()
 	for k, v in pairs(triggers) do
-		if not v.finished and is_pl_in_box(v.box) then
+		if v.active and is_pl_in_box(v.box) then
 			v.func()
+			if v.pos != nil then
+				pl.x = v.pos.x
+				pl.y = v.pos.y
+			end
 		end
 	end
 end
@@ -479,8 +613,8 @@ function title_update()
 end
 
 actors = {} -- all actors in world.
-offh = 16*4
-offw = 16*6
+offh = 64
+offw = 96
 
 viewx = 0
 viewy = 0
@@ -1359,7 +1493,6 @@ function gen_sword_stand(x, y)
 	sword.h = .4
 	sword.draw=
 		function(a)
-			-- 0 is the black bacground.
 			draw_actor(a, 1, 2, nil, nil)
 		end
 

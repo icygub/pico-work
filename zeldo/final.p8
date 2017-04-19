@@ -357,10 +357,6 @@ function make_boss(prev_marker, x, y)
 
 	triggers["boss_exit"].func =
 		function()
-			canon.reset()
-			if triggers["canon_intro"].active == false then
-				triggers["canon_resume"].active = true
-			end
 			marker = "overworld"
 		end
 
@@ -503,10 +499,22 @@ scene_actors = {}
 draw_map_funcs = {}
 triggers = {}
 
+function del_if_enemy(enemy)
+	-- all enemies are bad.
+	if enemy.bad then
+		del(actors, enemy)
+	end
+end
+
+function clean_enemies()
+	foreach(actors, del_if_enemy)
+end
+
 -- use right before changing the scene.
 function save_scene()
 	-- should call this on multiple actors eventually.
 	pl.unload()
+	canon.unload()
 	actors = {}
 end
 
@@ -1898,6 +1906,16 @@ function gen_canondwarf(x, y)
 			bad.hearts = 6
 			bad.vulnerable = false
 			bad.clock = true
+		end
+
+	bad.unload =
+		function()
+			clean_enemies()
+			add(actors, bad)
+			canon.reset()
+			if triggers["canon_intro"].active == false then
+				triggers["canon_resume"].active = true
+			end
 		end
 
 	bad.reset()

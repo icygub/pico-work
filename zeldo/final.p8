@@ -505,7 +505,8 @@ triggers = {}
 
 -- use right before changing the scene.
 function save_scene()
-	del(actors, pl)
+	-- should call this on multiple actors eventually.
+	pl.unload()
 	actors = {}
 end
 
@@ -826,6 +827,9 @@ function make_actor(x, y)
 	-- called if two actors are in bounds (not outside) and are touching each
 	-- other.
 	a.hit = function(other) end
+
+	-- gets called if the scene is switching, so the actor would be leaving.
+	a.unload = function() end
 
 	-- gets called if the actor is out of bounds.
 	a.outside = function(self) end
@@ -1602,6 +1606,21 @@ function gen_link(x, y)
 		function()
 			if pl.hearts < pl.max_hearts then
 				pl.hearts += 1
+			end
+		end
+
+	-- unload the player, boomerang, and sword.
+	pl.unload =
+		function()
+			del(actors, pl)
+			if pl.boomerang != nil then
+				del(actors, pl.boomerang)
+				pl.boomerang = nil
+			end
+
+			if pl.sword != nil then
+				del(actors, pl.sword)
+				pl.sword = nil
 			end
 		end
 

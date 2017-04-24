@@ -31,6 +31,8 @@ function _init()
 end
 
 function _update()
+	shake(true) -- reset the shake.
+
 	-- only update if we are not in the middle of a marker change.
 	if prev_marker == marker and not sleep then
 		prev_marker = marker
@@ -352,10 +354,10 @@ end
 
 -- triggers are boxes you collide with that can make events happen.
 -- pos is where the player gets teleported to if the trigger is touched.
-function make_trigger(name, x1, y1, x2, y2, pos, mark)
+function make_trigger(name, x1, y1, x2, y2, pos, mark, mus, snd)
 	local func=nil
 	if mark != nil then
-		func = function() marker=mark end
+		func = function() transition(mark, mus, snd) end
 	end
 
 	triggers[name] = {box={x1=x1, y1=y1, x2=x2, y2=y2}, active=true, pos=pos, func=func}

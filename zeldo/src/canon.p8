@@ -64,9 +64,8 @@ function gen_canondwarf(x, y)
 
 	bad.load =
 		function()
-			music(-1)
-			if not bad.killed then
-				music(53)
+			if bad.killed then
+				music(-1)
 			end
 		end
 
@@ -97,7 +96,10 @@ function gen_canondwarf(x, y)
 			end
 
 			if bad.hearts <= 0 and bad.state < 11 then
-				canon_kill(bad)
+				sfx(22)
+				music(-1)
+				bad.state = 11
+				bad.timer = 90 -- how long to shake when dead.
 			end
 		end
 
@@ -193,12 +195,17 @@ function canon_move(self)
 			shake()
 		end
 		self.timer -= 1
-	elseif self.state == 11 then -- defeated
+	elseif self.state == 11 then -- defeated, shaking like crazy.
+		shake()
+		self.timer -= 1
+		if self.timer <= 0 then
+			canon_kill(self)
+		end
 	end
 end
 
 function canon_kill(bad)
-	bad.state = 11
+	bad.state = 12
 	music(-1)
 
 	bad.killed = true
@@ -217,7 +224,13 @@ function canon_kill(bad)
 	-- make zelda
 	mset(101, 2, 98)
 	mset(102, 2, 99)
+	bad.x = 104
+	bad.y = 3.5
+	pl.x = 103
+	pl.y = 4.5
+
 	gen_zeldo(102, 3.5)
+	transition(marker)
 
 	ivan_reveal_cutscene()
 end

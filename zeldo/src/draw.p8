@@ -245,7 +245,7 @@ function _draw()
 	local prev_trans_active = trans_active
 	trans_after_peak = transition_draw(30, screen_swipe)
 
-	if prev_trans_active != trans_active then
+	if prev_trans_active != trans_active and trans_song != nil then
 		music(trans_song)
 	end
 
@@ -272,16 +272,13 @@ function transition(mark, music_when_done, sound_effect)
 		trans_timer = 0
 		trans_after_peak = false
 		sleep = true
-		if music_when_done == nil then
-			trans_song = -1
-		else
-			trans_song = music_when_done
-		end
 
-		music(-1)
+		trans_song = music_when_done
+
 		if sound_effect == nil then
 			sfx(-1)
 		else
+			music(-1)
 			sfx(sound_effect)
 		end
 	end
@@ -306,9 +303,9 @@ function screen_swipe(length, timer)
 	local pos = 128 * sin(timer / length / 2 + .5)
 
 	if timer > length / 2 then
-		rectfill(128-pos,0,129,128,0)
+		rectfill(128-pos,-1,129,129,0)
 	else
-		rectfill(-1,0,pos,128,0)
+		rectfill(-1,-1,pos,129,0)
 	end
 
 	return timer >= flr(length / 2)

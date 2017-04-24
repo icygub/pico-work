@@ -36,6 +36,8 @@ function _init()
 end
 
 function _update()
+	shake(true) -- reset the shake.
+
 	-- only update if we are not in the middle of a marker change.
 	if prev_marker == marker and not sleep then
 		prev_marker = marker
@@ -357,10 +359,10 @@ end
 
 -- triggers are boxes you collide with that can make events happen.
 -- pos is where the player gets teleported to if the trigger is touched.
-function make_trigger(name, x1, y1, x2, y2, pos, mark)
+function make_trigger(name, x1, y1, x2, y2, pos, mark, mus, snd)
 	local func=nil
 	if mark != nil then
-		func = function() marker=mark end
+		func = function() transition(mark, mus, snd) end
 	end
 
 	triggers[name] = {box={x1=x1, y1=y1, x2=x2, y2=y2}, active=true, pos=pos, func=func}
@@ -397,7 +399,7 @@ end
 
 function title_update()
 	if btnp(4) then
-		transition("hut", 63)
+		transition("hut", 63, 63)
 	end
 end
 
@@ -599,9 +601,8 @@ function gen_canondwarf(x, y)
 
 	bad.load =
 		function()
-			music(-1)
-			if not bad.killed then
-				music(53)
+			if bad.killed then
+				music(-1)
 			end
 		end
 
@@ -632,7 +633,10 @@ function gen_canondwarf(x, y)
 			end
 
 			if bad.hearts <= 0 and bad.state < 11 then
-				canon_kill(bad)
+				sfx(22)
+				music(-1)
+				bad.state = 11
+				bad.timer = 90 -- how long to shake when dead.
 			end
 		end
 
@@ -728,12 +732,17 @@ function canon_move(self)
 			shake()
 		end
 		self.timer -= 1
-	elseif self.state == 11 then -- defeated
+	elseif self.state == 11 then -- defeated, shaking like crazy.
+		shake()
+		self.timer -= 1
+		if self.timer <= 0 then
+			canon_kill(self)
+		end
 	end
 end
 
 function canon_kill(bad)
-	bad.state = 11
+	bad.state = 12
 	music(-1)
 
 	bad.killed = true
@@ -752,7 +761,13 @@ function canon_kill(bad)
 	-- make zelda
 	mset(101, 2, 98)
 	mset(102, 2, 99)
+	bad.x = 104
+	bad.y = 3.5
+	pl.x = 103
+	pl.y = 4.5
+
 	gen_zeldo(102, 3.5)
+	transition(marker)
 
 	ivan_reveal_cutscene()
 end
@@ -1012,7 +1027,7 @@ function _draw()
 	local prev_trans_active = trans_active
 	trans_after_peak = transition_draw(30, screen_swipe)
 
-	if prev_trans_active != trans_active then
+	if prev_trans_active != trans_active and trans_song != nil then
 		music(trans_song)
 	end
 
@@ -1039,16 +1054,13 @@ function transition(mark, music_when_done, sound_effect)
 		trans_timer = 0
 		trans_after_peak = false
 		sleep = true
-		if music_when_done == nil then
-			trans_song = -1
-		else
-			trans_song = music_when_done
-		end
 
-		music(-1)
+		trans_song = music_when_done
+
 		if sound_effect == nil then
 			sfx(-1)
 		else
+			music(-1)
 			sfx(sound_effect)
 		end
 	end
@@ -1073,9 +1085,9 @@ function screen_swipe(length, timer)
 	local pos = 128 * sin(timer / length / 2 + .5)
 
 	if timer > length / 2 then
-		rectfill(128-pos,0,129,128,0)
+		rectfill(128-pos,-1,129,129,0)
 	else
-		rectfill(-1,0,pos,128,0)
+		rectfill(-1,-1,pos,129,0)
 	end
 
 	return timer >= flr(length / 2)
@@ -1536,7 +1548,7 @@ function make_final_exit(path_num, dir)
 			-- get rid of last one and enable first one.
 			toggle_lost_room(path_num, false)
 			toggle_lost_room(1, true)
-			marker = "sacred"
+			transition("sacred", 63, 63)
 		end
 end
 
@@ -1548,7 +1560,7 @@ function lost_woods_triggers(lost_woods_path)
 		function()
 			toggle_lost_room_str(marker, false)
 			toggle_lost_room(1, true)
-			marker = "overworld"
+			transition("overworld")
 		end
 
 	-- the keys are indexes like an array
@@ -1606,14 +1618,14 @@ function make_map()
 	actors = {}
 end
 
-function make_hut(prev_marker)
+function make_hut()
 	actors = {}
 
 	scene_actors["hut"] = actors
 	actors = {}
 end
 
-function make_sacred(prev_marker)
+function make_sacred()
 	actors = {}
 
 	gen_chest(119.5, 36.5,
@@ -1628,7 +1640,7 @@ function make_sacred(prev_marker)
 	actors = {}
 end
 
-function make_old(prev_marker)
+function make_old()
 	actors = {}
 
 	gen_sign(97.5, 39.5, "that chest holds all that is left of my father. please don't open the it.")
@@ -1643,7 +1655,7 @@ function make_old(prev_marker)
 	actors = {}
 end
 
-function make_boss(prev_marker, x, y)
+function make_boss()
 	actors = {}
 
 	canon = gen_canondwarf(104,3.5)
@@ -1660,15 +1672,10 @@ function make_boss(prev_marker, x, y)
 	make_trigger("canon_intro",  100,  1,     108,  9)
 	make_trigger("canon_resume", 100,  1,     108,  9)
 
-	make_trigger("boss_enter",   87,   3,     89,   4.5,  {x=104,  y=19.5}, "boss")
-	make_trigger("boss_exit",    101,  20,    107,  21,   {x=88, y=4.5},  "overworld")
+	make_trigger("boss_enter",   87,   3,     89,   4.5,  {x=104,  y=19.5}, "boss", 53, -1)
+	make_trigger("boss_exit",    101,  20,    107,  21,   {x=88, y=4.5},  "overworld", 14, -1)
 
 	triggers["canon_resume"].active = false
-
-	triggers["boss_exit"].func =
-		function()
-			marker = "overworld"
-		end
 
 	triggers["canon_resume"].func =
 		function()
@@ -1699,7 +1706,7 @@ function make_boss(prev_marker, x, y)
 	actors = {}
 end
 
-function make_shop(prev_marker, x, y)
+function make_shop()
 	actors = {}
 
 	gen_oldman(106.5, 35.5,
@@ -2088,6 +2095,9 @@ function control_player(pl)
 		-- sfx(1)
 	end
 	
+	if pl.regenerate > 0 then
+		shake()
+	end
 end
 
 function gen_link(x, y)
@@ -2103,7 +2113,6 @@ function gen_link(x, y)
 	pl.draw =
 		function(self)
 			if pl.regenerate > 0 then
-				shake()
 				if pl.t % 10 < 3 then return end
 			end
 			draw_actor(self)
@@ -2190,15 +2199,15 @@ function make_triggers()
 	make_trigger("hut_start",    97,   33,    100,  36)
 	make_trigger("mast_intro",   115,  37,    121,  41)
 
-	make_trigger("hut_enter",    7,    4.5,   9,    5.5,  {x=98.5,    y=36.5}, "hut")
-	make_trigger("old_enter",    15,   47.5,  17,   48.5, {x=98.5,    y=42.5}, "old")
-	make_trigger("shop_enter",   29,   55.5,  31,   56.5, {x=106.5,   y=42.5}, "shop")
+	make_trigger("hut_enter",    7,    4.5,   9,    5.5,  {x=98.5,    y=36.5}, "hut",  63, -1)
+	make_trigger("old_enter",    15,   47.5,  17,   48.5, {x=98.5,    y=42.5}, "old",  63, -1)
+	make_trigger("shop_enter",   29,   55.5,  31,   56.5, {x=106.5,   y=42.5}, "shop", 63, -1)
 	make_trigger("lost_enter",   31,   0,     33,   1,    {x=102,     y=54.5}, get_lost_name(1))
 
-	make_trigger("hut_exit",    97,   37,    100,  38,   {x=8,    y=5.5},  "overworld")
-	make_trigger("old_exit",    97,   43,    100,  44,   {x=16,   y=48.5}, "overworld")
-	make_trigger("shop_exit",   104,  43,    109,  44,   {x=29.5, y=56.5}, "overworld")
-	make_trigger("sacred_exit", 116,  55,    120,  56,   {x=32.5, y=1.5},  "overworld")
+	make_trigger("hut_exit",    97,   37,    100,  38,   {x=8,    y=5.5},  "overworld", 14, -1)
+	make_trigger("old_exit",    97,   43,    100,  44,   {x=16,   y=48.5}, "overworld", 14, -1)
+	make_trigger("shop_exit",   104,  43,    109,  44,   {x=29.5, y=56.5}, "overworld", 14, -1)
+	make_trigger("sacred_exit", 116,  55,    120,  56,   {x=32.5, y=1.5},  "overworld", 14, -1)
 
 	-- start out false
 
@@ -2252,9 +2261,9 @@ function scene_init()
 	local y = 0
 
 	if marker == "boss" then
-	elseif marker == "overworld" then
-		music(-1)
-		music(14)
+	--elseif marker == "overworld" then
+		--music(-1)
+		--music(14)
 	elseif marker == "hut" then
 		--music(-1)
 		--music(63)
@@ -2263,21 +2272,21 @@ function scene_init()
 			pl.x = 98.5
 			pl.y = 34
 		end
-	elseif marker == "old" then
-		music(-1)
-		music(63)
-	elseif marker == "sacred" then
-		music(-1)
-		music(45)
-		-- just a filler song
+	--elseif marker == "old" then
+		--music(-1)
+		--music(63)
+	--elseif marker == "sacred" then
+		--music(-1)
+		--music(45)
+		---- just a filler song
 	elseif marker == "title" then
 		music(-1)
 		music(0)
 		pl.visible = false
 
-	elseif marker == "shop" then
-		music(-1)
-		music(63)
+	--elseif marker == "shop" then
+		--music(-1)
+		--music(63)
 	end
 
 	load_scene(marker)

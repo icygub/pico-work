@@ -40,14 +40,14 @@ function make_map()
 	actors = {}
 end
 
-function make_hut(prev_marker)
+function make_hut()
 	actors = {}
 
 	scene_actors["hut"] = actors
 	actors = {}
 end
 
-function make_sacred(prev_marker)
+function make_sacred()
 	actors = {}
 
 	gen_chest(119.5, 36.5,
@@ -62,7 +62,7 @@ function make_sacred(prev_marker)
 	actors = {}
 end
 
-function make_old(prev_marker)
+function make_old()
 	actors = {}
 
 	gen_sign(97.5, 39.5, "that chest holds all that is left of my father. please don't open the it.")
@@ -77,7 +77,7 @@ function make_old(prev_marker)
 	actors = {}
 end
 
-function make_boss(prev_marker, x, y)
+function make_boss()
 	actors = {}
 
 	canon = gen_canondwarf(104,3.5)
@@ -94,15 +94,10 @@ function make_boss(prev_marker, x, y)
 	make_trigger("canon_intro",  100,  1,     108,  9)
 	make_trigger("canon_resume", 100,  1,     108,  9)
 
-	make_trigger("boss_enter",   87,   3,     89,   4.5,  {x=104,  y=19.5}, "boss")
-	make_trigger("boss_exit",    101,  20,    107,  21,   {x=88, y=4.5},  "overworld")
+	make_trigger("boss_enter",   87,   3,     89,   4.5,  {x=104,  y=19.5}, "boss", 53, -1)
+	make_trigger("boss_exit",    101,  20,    107,  21,   {x=88, y=4.5},  "overworld", 14, -1)
 
 	triggers["canon_resume"].active = false
-
-	triggers["boss_exit"].func =
-		function()
-			marker = "overworld"
-		end
 
 	triggers["canon_resume"].func =
 		function()
@@ -133,7 +128,7 @@ function make_boss(prev_marker, x, y)
 	actors = {}
 end
 
-function make_shop(prev_marker, x, y)
+function make_shop()
 	actors = {}
 
 	gen_oldman(106.5, 35.5,

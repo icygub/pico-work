@@ -45,6 +45,9 @@ function control_player(pl)
 		-- sfx(1)
 	end
 	
+	if pl.regenerate > 0 then
+		shake()
+	end
 end
 
 function gen_link(x, y)
@@ -60,7 +63,6 @@ function gen_link(x, y)
 	pl.draw =
 		function(self)
 			if pl.regenerate > 0 then
-				shake()
 				if pl.t % 10 < 3 then return end
 			end
 			draw_actor(self)

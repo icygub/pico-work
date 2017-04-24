@@ -148,7 +148,7 @@ function make_final_exit(path_num, dir)
 			-- get rid of last one and enable first one.
 			toggle_lost_room(path_num, false)
 			toggle_lost_room(1, true)
-			marker = "sacred"
+			transition("sacred", 63, 63)
 		end
 end
 
@@ -160,7 +160,7 @@ function lost_woods_triggers(lost_woods_path)
 		function()
 			toggle_lost_room_str(marker, false)
 			toggle_lost_room(1, true)
-			marker = "overworld"
+			transition("overworld")
 		end
 
 	-- the keys are indexes like an array

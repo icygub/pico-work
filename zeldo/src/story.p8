@@ -9,15 +9,15 @@ function make_triggers()
 	make_trigger("hut_start",    97,   33,    100,  36)
 	make_trigger("mast_intro",   115,  37,    121,  41)
 
-	make_trigger("hut_enter",    7,    4.5,   9,    5.5,  {x=98.5,    y=36.5}, "hut")
-	make_trigger("old_enter",    15,   47.5,  17,   48.5, {x=98.5,    y=42.5}, "old")
-	make_trigger("shop_enter",   29,   55.5,  31,   56.5, {x=106.5,   y=42.5}, "shop")
+	make_trigger("hut_enter",    7,    4.5,   9,    5.5,  {x=98.5,    y=36.5}, "hut",  63, -1)
+	make_trigger("old_enter",    15,   47.5,  17,   48.5, {x=98.5,    y=42.5}, "old",  63, -1)
+	make_trigger("shop_enter",   29,   55.5,  31,   56.5, {x=106.5,   y=42.5}, "shop", 63, -1)
 	make_trigger("lost_enter",   31,   0,     33,   1,    {x=102,     y=54.5}, get_lost_name(1))
 
-	make_trigger("hut_exit",    97,   37,    100,  38,   {x=8,    y=5.5},  "overworld")
-	make_trigger("old_exit",    97,   43,    100,  44,   {x=16,   y=48.5}, "overworld")
-	make_trigger("shop_exit",   104,  43,    109,  44,   {x=29.5, y=56.5}, "overworld")
-	make_trigger("sacred_exit", 116,  55,    120,  56,   {x=32.5, y=1.5},  "overworld")
+	make_trigger("hut_exit",    97,   37,    100,  38,   {x=8,    y=5.5},  "overworld", 14, -1)
+	make_trigger("old_exit",    97,   43,    100,  44,   {x=16,   y=48.5}, "overworld", 14, -1)
+	make_trigger("shop_exit",   104,  43,    109,  44,   {x=29.5, y=56.5}, "overworld", 14, -1)
+	make_trigger("sacred_exit", 116,  55,    120,  56,   {x=32.5, y=1.5},  "overworld", 14, -1)
 
 	-- start out false
 
@@ -71,9 +71,9 @@ function scene_init()
 	local y = 0
 
 	if marker == "boss" then
-	elseif marker == "overworld" then
-		music(-1)
-		music(14)
+	--elseif marker == "overworld" then
+		--music(-1)
+		--music(14)
 	elseif marker == "hut" then
 		--music(-1)
 		--music(63)
@@ -82,21 +82,21 @@ function scene_init()
 			pl.x = 98.5
 			pl.y = 34
 		end
-	elseif marker == "old" then
-		music(-1)
-		music(63)
-	elseif marker == "sacred" then
-		music(-1)
-		music(45)
-		-- just a filler song
+	--elseif marker == "old" then
+		--music(-1)
+		--music(63)
+	--elseif marker == "sacred" then
+		--music(-1)
+		--music(45)
+		---- just a filler song
 	elseif marker == "title" then
 		music(-1)
 		music(0)
 		pl.visible = false
 
-	elseif marker == "shop" then
-		music(-1)
-		music(63)
+	--elseif marker == "shop" then
+		--music(-1)
+		--music(63)
 	end
 
 	load_scene(marker)

@@ -1,0 +1,136 @@
+
+function gen_deku(x, y)
+	local bad = gen_enemy(x, y)
+	bad.spr = 70
+
+	-- deku shoots every so often.
+	bad.move =
+		function(a)
+			if a.t % 60 == 0 then
+				local dx = -.4
+				if a.x < pl.x then
+					dx = .4
+				end
+				gen_deku_bullet(a.x,a.y,dx,0)
+			end
+		end
+
+	return bad
+end
+
+function gen_skelly(x, y)
+	local bad = gen_enemy(x, y)
+	bad.spr = 68
+	bad.move = function(self) move_to_player(self, .1) end
+	bad.inertia = 0
+	return bad
+end
+
+function gen_deku_bullet(x,y,dx,dy)
+	local bad = gen_bullet(x,y,dx,dy)
+	bad.spr = 71
+	return bad
+end
+
+function gen_poe(x, y)
+	local bad = gen_enemy(x, y)
+	bad.spr = 116
+	bad.solid = false
+	bad.touchable = false
+	bad.move = function(self) move_counter(self, 4, 5, 5, self.t) end
+	bad.draw =
+		function(a)
+			draw_actor(a, nil, nil, a.dx > 0, nil)
+		end
+	return bad
+end
+
+function gen_dark_link(x, y)
+	local bad = gen_enemy(x, y)
+	bad.spr = 124
+	return bad
+end
+
+function gen_octorok(x, y)
+	local bad = gen_enemy(x, y)
+	bad.spr = 86
+	return bad
+end
+
+function gen_enemy(x, y)
+	local bad = make_actor(x, y)
+	bad.spr = 1
+	bad.dx=0
+	bad.dy=0
+	bad.inertia=.5
+	bad.bad=true
+	bad.hearts=0
+	bad.solid=true
+	bad.move = function(self) end
+	bad.hit=
+		function(other)
+			if other == pl.boomerang then
+				bad.stun = 30
+			end
+
+			if other.good then
+				bad.alive = false
+			end
+		end
+
+	bad.destroy =
+		function(self)
+			local col = nil
+			-- smaller chance you get a heart.
+			if dice_roll(5) then
+				col = gen_heart(bad.x, bad.y)
+			else
+				col = gen_power_orb(bad.x, bad.y)
+			end
+			
+			col.dx = bad.dx*3
+			col.dy = bad.dy*3
+		end
+
+	-- enemy faces player, assumes sprite is facing left
+	bad.draw =
+		function(a)
+			draw_actor(a, nil, nil, a.x < pl.x, nil)
+		end
+
+	return bad
+end
+
+
+function gen_bullet(x,y,dx,dy)
+	local bad = gen_enemy(x,y)
+	if dx == nil then dx = 0 end
+	if dy == nil then dy = 0 end
+	bad.dx = dx
+	bad.dy = dy
+	bad.inertia=1
+	bad.solid=false
+	bad.touchable=false
+	bad.destroy=function(self) end
+	-- die if the bullet is out of bounds.
+	bad.outside=
+		function(a)
+			a.alive = false
+		end
+
+	-- rotate the bullet
+	bad.draw=
+		function(a)
+			if a.t % 40 < 10 then
+				draw_actor(a, nil, nil, false, false)
+			elseif a.t % 30 < 10 then
+				draw_actor(a, nil, nil, false, true)
+			elseif a.t % 20 < 10 then
+				draw_actor(a, nil, nil, true, true)
+			elseif a.t % 10 < 10 then
+				draw_actor(a, nil, nil, true, false)
+			end
+		end
+
+	return bad
+end

@@ -1,450 +1,21 @@
 pico-8 cartridge // http://www.pico-8.com
 version 8
 __lua__
--- zeldo - alan morgan.
+-- zeldo - alan morgan
 
+scene_actors = {}
+draw_map_funcs = {}
+triggers = {}
 marker = "title"  -- where you are in the story, start on title screen.
+global_time=0 -- the global timer of the game, used by text box functions
 
-function make_lost_woods(path_len)
-	actors = {}
-	gen_sign(100.5,46.5, "don't get lost!")
+actors = {} -- all actors in world.
+offh = 64
+offw = 96
 
-	scene_actors[get_lost_name(1)] = actors
-	actors = {}
+viewx = 0
+viewy = 0
 
-	for i=2, path_len do
-		gen_lost_actors(i, path_len)
-	end
-
-	local path = make_lost_path(path_len)
-	lost_woods_triggers(path)
-end
-
-function gen_lost_actors(path_num, path_len)
-	actors = {}
-
-	gen_skelly(102,50)
-
-	scene_actors[get_lost_name(path_num)] = actors
-	actors = {}
-end
-
--- returns the list of path directions.
-function make_lost_path(path_len)
-	-- can't have a path that allows you to go right then left.
-	-- if 0 then 0 or 1. if 2 then 1 or 2.
-	local lost_woods_path = {}
-	local prev_num = 1
-
-	for i=1, path_len-1 do
-		local new_num = 1
-
-		if prev_num == 0 then
-			new_num = flr(rnd(2))
-		elseif prev_num == 1 then
-			new_num = flr(rnd(3))
-		else -- must be 2
-			new_num = flr(rnd(2)) + 1
-		end
-			
-		add(lost_woods_path, new_num)
-		prev_num = new_num
-	end
-
-	add(lost_woods_path, 1)
-	return lost_woods_path
-end
-
--- a utility function to make a trigger in one of the three lost woods directions
--- used in make_wrong_exit, make_right_exit, and make_final_exit.
--- 0 = left, 1 = up, 2 = right
-function make_lost_dir_trigger(str, dir)
-	if dir == 0 then
-		make_trigger(str, 96, 48, 97, 52, {x=106.5, y=50})
-	elseif dir == 1 then
-		make_trigger(str, 100, 44, 104, 45, {x=102, y=54.5})
-	else -- dir is 2
-		make_trigger(str, 107, 48, 108, 52, {x=97.5, y=50})
-	end
-	triggers[str].active = false
-end
-
-function get_lost_name(room_num)
-	return "lost_woods_"..room_num
-end
-
-function get_lost_right_name(room_num)
-	return "lost_woods_"..room_num.."_right"
-end
-
-function get_lost_wrong1_name(room_num)
-	return "lost_woods_"..room_num.."_wrong_1"
-end
-
-function get_lost_wrong2_name(room_num)
-	return "lost_woods_"..room_num.."_wrong_2"
-end
-
--- pass in true to make the room active, or false to make it inactive.
-function toggle_lost_room_str(room_name, active)
-	local str1 = room_name.."_wrong_1"
-	local str2 = room_name.."_wrong_2"
-	local str3 = room_name.."_right"
-
-	triggers[str1].active = active
-	triggers[str2].active = active
-	triggers[str3].active = active
-end
-
-function toggle_lost_room(room_num, active)
-	local str1 = get_lost_wrong1_name(room_num)
-	local str2 = get_lost_wrong2_name(room_num)
-	local str3 = get_lost_right_name(room_num)
-
-	if room_num > 0 then
-		triggers[str1].active = active
-		triggers[str2].active = active
-		triggers[str3].active = active
-	end
-end
-
--- switches the triggers. if either are 0, then nothing happens for that one.
-function switch_lost_room(cur_num, nxt_num)
-	toggle_lost_room(cur_num, false)
-	toggle_lost_room(nxt_num, true)
-	marker = get_lost_name(nxt_num)
-end
-
--- there are only two wrongs. 1 and 2.
-function make_wrong_exits(path_num, dir1, dir2)
-	local str1 = get_lost_wrong1_name(path_num)
-	local str2 = get_lost_wrong2_name(path_num)
-
-	make_lost_dir_trigger(str1, dir1)
-	make_lost_dir_trigger(str2, dir2)
-
-	local reset_func=
-		function()
-			-- go to the first lost room.
-			switch_lost_room(path_num, 1)
-		end
-
-	triggers[str1].func = reset_func
-	triggers[str2].func = reset_func
-end
-
-function make_right_exit(path_num, dir)
-	local str = get_lost_right_name(path_num)
-	local nxt = get_lost_name(path_num+1)
-	make_lost_dir_trigger(str, dir)
-
-	triggers[str].func =
-		function()
-			-- go to next room
-			switch_lost_room(path_num, path_num+1)
-		end
-end
-
-function make_final_exit(path_num, dir)
-	local str = get_lost_right_name(path_num)
-	make_lost_dir_trigger(str, dir)
-	triggers[str].pos = {x=118,y=54.5}
-
-	triggers[str].func =
-		function()
-			-- get rid of last one and enable first one.
-			toggle_lost_room(path_num, false)
-			toggle_lost_room(1, true)
-			marker = "sacred"
-		end
-end
-
--- assumes the items in lost woods path are a 0, 1, or 2
-function lost_woods_triggers(lost_woods_path)
-	local str_exit = "lost_woods_exit"
-	make_trigger(str_exit, 100,  55, 104,  56, {x=32, y=1.5})
-	triggers[str_exit].func =
-		function()
-			toggle_lost_room_str(marker, false)
-			toggle_lost_room(1, true)
-			marker = "overworld"
-		end
-
-	-- the keys are indexes like an array
-	for k,v in pairs(lost_woods_path) do
-		if k == #lost_woods_path then
-			make_final_exit(k, v)
-		else
-			make_right_exit(k, v)
-		end
-
-		make_wrong_exits(k, (v+1)%3, (v+2)%3)
-	end
-
-	toggle_lost_room(1, true) -- make the first lost room enabled at the start.
-end
-
-function make_map()
-	actors = {}
-
-	gen_sign(34.5, 17.5, "the square force has protected the land of hiroll for ages.")
-	gen_chest(40.5, 7.5, 
-		function()
-			heart_container()
-		end)
-
-	gen_sign(9.5,5.5, "lank's house")
-
-	gen_sign(14.5,48.5, "old man's house")
-	gen_grave(17.5,48.5, "here lies an even older man. i love you dad. :)")
-
-	gen_oldman(31.5, 2.5,
-		function(self)
-			if self.state == 0 then
-				if power_orb_count >= 50 then
-					tbox("old man", "oh, you have 50 power orbs. i'll take those. hehe.")
-					power_orb_count -= 50
-					mset(32,2,3) -- set the block to grass.
-					self.state = 1
-				else
-					tbox("old man", "a powerful sword along with powerful enemies lie beyond here.")
-					tbox("old man", "come back when you've collected 50 power orbs.")
-				end
-			else
-				tbox("old man", "thanks for the orbs.")
-			end
-		end)
-
-	-- things from alpha
-	gen_poe(57.5,10.5)
-	gen_poe(8, 9.5)
-	gen_enemies()
-
-	scene_actors["overworld"] = actors
-	actors = {}
-end
-
-function make_triggers()
-	-- trigger positions
-	make_trigger("no_sword",     7,    10,    9,    12)
-	make_trigger("no_sword",     7,    10,    9,    12)
-	make_trigger("steal"   ,     97,   39,    100,  42)
-	make_trigger("hut_start",    97,   33,    100,  36)
-	make_trigger("mast_intro",   115,  37,    121,  41)
-
-	make_trigger("hut_enter",    7,    4.5,   9,    5.5,  {x=98.5,    y=36.5}, "hut")
-	make_trigger("old_enter",    15,   47.5,  17,   48.5, {x=98.5,    y=42.5}, "old")
-	make_trigger("shop_enter",   29,   55.5,  31,   56.5, {x=106.5,   y=42.5}, "shop")
-	make_trigger("lost_enter",   31,   0,     33,   1,    {x=102,     y=54.5}, get_lost_name(1))
-
-	make_trigger("hut_exit",    97,   37,    100,  38,   {x=8,    y=5.5},  "overworld")
-	make_trigger("old_exit",    97,   43,    100,  44,   {x=16,   y=48.5}, "overworld")
-	make_trigger("shop_exit",   104,  43,    109,  44,   {x=29.5, y=56.5}, "overworld")
-	make_trigger("sacred_exit", 116,  55,    120,  56,   {x=32.5, y=1.5},  "overworld")
-
-	-- start out false
-
-	triggers["mast_intro"].func =
-		function()
-			tbox("ivan", "yes. lank, once you wield this, you can finally defeat canondwarf. haha!")
-			tbox("lank", "wow, i think i can do this.")
-			triggers["mast_intro"].active=false
-		end
-
-	triggers["hut_start"].func =
-		function()
-			tbox("ivan", "hey! listen!")
-			tbox("ivan", "wake up lank.")
-			tbox("lank", "...")
-			tbox("ivan", "lank, princess zeldo is being held captive by canondwarf! you gotta rescue her!")
-			tbox("lank", "who are you?")
-			tbox("ivan", "i'm your fairy")
-			tbox("lank", "oh, okay.")
-			triggers["hut_start"].active=false
-		end
-
-	triggers["steal"].func =
-		function()
-			tbox("ivan", "look! it's a chest.  try pressing z near it.")
-			tbox("lank", "but it's not mine..")
-			tbox("ivan", "nevermind that. you're just borrowing it.")
-			tbox("lank", "well, i guess i could give it back later.")
-			
-			triggers["steal"].active=false
-		end
-
-	triggers["no_sword"].func =
-		function()
-			tbox("ivan", "hey, listen! you don't have a sword yet! how can you save zeldo like this?")
-			triggers["no_sword"].active=false
-		end
-end
-
-function make_scenes()
-	make_map()
-	make_hut()
-	make_shop()
-	make_boss()
-	make_old()
-	make_lost_woods(5) -- how long the woods are
-	make_sacred()
-end
-
-
-
------------------------------------
--- these are just in charge of creating the sprites that go in each scene.
------------------------------------
-
-function make_hut(prev_marker)
-	actors = {}
-
-	scene_actors["hut"] = actors
-	actors = {}
-end
-
-function make_sacred(prev_marker)
-	actors = {}
-
-	gen_chest(119.5, 36.5,
-		function()
-			heart_container()
-		end)
-
-	gen_sign(116.5, 36.5, "only the hero of hiroll can wield this sword.")
-	gen_sword_stand(118, 36.5)
-
-	scene_actors["sacred"] = actors
-	actors = {}
-end
-
-function make_old(prev_marker)
-	actors = {}
-
-	gen_sign(97.5, 39.5, "that chest holds all that is left of my father. please don't open the it.")
-	gen_chest(99.5, 39.5,
-		function()
-			pl.has_boomerang = true
-			tbox("", "you found a boomerang!")
-			tbox("", "hold x then press an arrow key to use it.")
-		end)
-
-	scene_actors["old"] = actors
-	actors = {}
-end
-
-function make_boss(prev_marker, x, y)
-	actors = {}
-
-	canon = gen_canondwarf(104,3.5)
-	gen_chest(100.5, 2.5,
-		function()
-			power_orb_count += 49
-			canon.tres_text = "theif."
-
-			tbox("", "you found 49 power orbs. canondwarf doesn't deserve these anyway.")
-			tbox("canondwarf", "oh now you steal from me. i'll never forgive you for this.")
-		end)
-	gen_sign(107.5, 2.5, "cages are reserved for special guests.")
-
-	make_trigger("canon_intro",  100,  1,     108,  9)
-	make_trigger("canon_resume", 100,  1,     108,  9)
-
-	make_trigger("boss_enter",   87,   3,     89,   4.5,  {x=104,  y=19.5}, "boss")
-	make_trigger("boss_exit",    101,  20,    107,  21,   {x=88, y=4.5},  "overworld")
-
-	triggers["canon_resume"].active = false
-
-	triggers["boss_exit"].func =
-		function()
-			marker = "overworld"
-		end
-
-	triggers["canon_resume"].func =
-		function()
-			music(-1)
-			tbox("canondwarf", "mwahahahahahahahahahaha.")
-			tbox("canondwarf", "i see you're back. you'll pay you little "..canon.tres_text)
-			sfx(59)
-			canon.spr = 108
-			canon.state = 1
-			triggers["canon_resume"].active=false
-		end
-
-	triggers["canon_intro"].func =
-		function()
-			music(-1)
-			tbox("canondwarf", "mwahahahahahahahahahaha.")
-			tbox("canondwarf", "who are you?")
-			tbox("lank", "i'm lank.")
-			tbox("zeldo", "lank you're here! i have to tell you something. don't listen to-")
-			tbox("canondwarf", "be quiet princess! i'm going to take care of this trespasser.")
-			sfx(59)
-			canon.spr = 108
-			canon.state = 1
-			triggers["canon_intro"].active=false
-		end
-
-	scene_actors["boss"] = actors
-	actors = {}
-end
-
--- what happens when you find a heart container.
-function heart_container()
-	tbox("", "you got a heart container.")
-	tbox("", "your max health is now increased by one.")
-	pl.max_hearts += 1
-	pl.hearts = pl.max_hearts
-
-end
-
-function make_shop(prev_marker, x, y)
-	actors = {}
-
-	gen_oldman(106.5, 35.5,
-		function(self)
-			if self.state == 0 then
-				tbox("shopkeeper", "i love selling things.")
-				tbox("shopkeeper", "press z below one of the items to buy it.")
-			end
-		end)
-
-	gen_item(103.5, 38.5, 50, 117,
-		function(item)
-			if not pl.has_fairy then
-				tbox("", "you got a fairy in a bottle.")
-				tbox("", "it will heal you if you've lost all your hearts.")
-				pl.has_fairy = true
-				item.alive = false
-				return true
-			else
-				return false
-			end
-		end)
-
-	gen_item(106.5, 38.5, 49, 56,
-		function(item)
-			if not pl.has_sword then
-				tbox("", "you got a sword.")
-				tbox("", "hold z then press an arrow key to use it.")
-				pl.has_sword = true
-				item.alive = false
-				return true
-			else
-				return false
-			end
-		end)
-
-	gen_item(109.5, 38.5, 50, 118,
-		function(item)
-			heart_container()
-			item.alive = false
-			return true
-		end)
-
-	scene_actors["shop"] = actors
-	actors = {}
-end
 
 -------------------------
 -- pico main
@@ -481,264 +52,6 @@ function _draw()
 	scene_draw()
 	draw_triggers() -- debugging
 	print(marker, 50, 2, 7)
-end
-
-
-
-
-
-
-
-
-
-
-
-
-
-scene_actors = {}
-draw_map_funcs = {}
-triggers = {}
-
-function del_if_enemy(enemy)
-	-- all enemies are bad.
-	if enemy.bad then
-		del(actors, enemy)
-	end
-end
-
-function clean_enemies()
-	foreach(actors, del_if_enemy)
-end
-
--- use right before changing the scene.
-function save_scene()
-	-- should call this on multiple actors eventually.
-	pl.unload()
-	canon.unload()
-	actors = {}
-end
-
--- use when switching to a new scene.
--- x and y are the player's new coordinates.
-function load_scene(scene_name)
-	save_scene()
-	actors = scene_actors[scene_name]
-
-	view_update()
-
-	add(actors, pl)
-end
-
--- sets up the game and player, but not the various objects that are scene
--- specific.
-function init_game()
-	actors = {}
-	pl = gen_link(8, 8)
-	gen_grass()
-end
-
--- gets called whenever the scene switches.
-function scene_init(prev_marker)
-	local x = 0
-	local y = 0
-
-	if marker == "boss" then
-		music(-1)
-		music(53)
-	elseif marker == "overworld" then
-		music(-1)
-		music(14)
-	elseif marker == "hut" then
-		music(-1)
-		music(63)
-		if prev_marker == "title" then
-			pl.visible = true
-			pl.x = 98.5
-			pl.y = 34
-		end
-	elseif marker == "old" then
-		music(-1)
-		music(63)
-	elseif marker == "sacred" then
-		music(-1)
-		music(45)
-		-- just a filler song
-	elseif marker == "title" then
-		music(-1)
-		music(0)
-		pl.visible = false
-
-	elseif marker == "shop" then
-		music(-1)
-		music(63)
-	end
-
-	load_scene(marker)
-end
-
-function scene_draw()
-	if marker == "title" then
-		draw_title()
-		return
-	end
-
-	if marker == "hut" then
-		draw_map(96, 32, 5, 5)
-	elseif marker == "boss" then
-		draw_map(offw, 0, 32, 32)
-	elseif marker == "overworld" then
-		draw_map(0, 0, offw, offh)
-		draw_wrap(0, 0, offw, offh)
-	elseif marker == "old" then
-		draw_map(96, 38, 5, 5)
-	elseif marker == "sacred" then
-		draw_map (113, 33, 10, 22)
-		draw_wrap(113, 33, 10, 22)
-	elseif marker == "shop" then
-		draw_map(101, 33, 11, 10)
-	else -- assume lost woods
-		draw_map (97, 45, 10, 10)
-		draw_wrap(97, 45, 10, 10, 1)
-	end
-
-	draw_things()
-	draw_hearts(126, 2)
-	draw_items(2, 118)
-	draw_power_orbs(2, 2)
-
-	if pl.alive == false then
-		draw_game_over()
-		draw_link_death()
-	end
-
-	draw_fairy()
-	tbox_draw()
-end
-
-function scene_update()
-	if not tbox_active() then
-		map_update()
-		trigger_update()
-		view_update()
-	else
-		tbox_interact()
-	end
-end
-
--- triggers are boxes you collide with that can make events happen.
--- pos is where the player gets teleported to if the trigger is touched.
-function make_trigger(name, x1, y1, x2, y2, pos, mark)
-	local func=nil
-	if mark != nil then
-		func = function() marker=mark end
-	end
-
-	triggers[name] = {box={x1=x1, y1=y1, x2=x2, y2=y2}, active=true, pos=pos, func=func}
-end
-
--- used for debugging purposes.
-function draw_triggers()
-	for k,v in pairs(triggers) do
-		rect(v.box.x1*8 + offset_x(),
-			  v.box.y1*8 + offset_y(),
-			  v.box.x2*8 + offset_x(),
-			  v.box.y2*8 + offset_y(), 10)
-	end
-end
-
-function trigger_update()
-	for k, v in pairs(triggers) do
-		if v.active and is_pl_in_box(v.box) then
-			v.func()
-			if v.pos != nil then
-				pl.x = v.pos.x
-				pl.y = v.pos.y
-			end
-		end
-	end
-end
-
--- updates the view with the player's coordinates. call whenever the player
--- changes position.
-function view_update()
-	viewx = pl.x
-	viewy = pl.y
-end
-
-function title_update()
-	if btnp(4) then
-		marker = "hut"
-	end
-end
-
-actors = {} -- all actors in world.
-offh = 64
-offw = 96
-
-viewx = 0
-viewy = 0
-
-power_orb_count = 0
-
-global_time=0 -- the global timer of the game, used by text box functions
-tbox_messages={} -- the array for keeping track of text box overflows
-
--- a super useful function. pass in the sprite id and this will return the
--- transparency color.
-function get_alt(id)
-	if id == 43 or
-	   id == 44 or
-	   id == 56 or
-	   id == 57 then
-		return 15
-	elseif id == 16 or
-	       id == 27 or
-	       id == 28 or
-	       id == 32 or
-	       id == 48 or
-	       id == 112 or
-	       id == 119 or
-	       id == 113 then
-		return 0
-	end
-
-	-- def is 7 for this game.
-	return 7
-end
-
--- draws how many power orbs have been collected.
-function draw_power_orbs(x, y)
-	-- hearts on right of screen
-	draw_to_screen(55, x-1, y-1)
-	print(power_orb_count, x+8, y+1, 7)
-end
-
--- draws the various items that have been collected so far.
-function draw_items(x, y)
-	local stats = {}
-
-	if pl.has_sword then
-		if pl.has_master then
-			add(stats, 43)
-		else
-			add(stats, 56)
-		end
-	end
-
-	if pl.has_boomerang then
-		add(stats, 54)
-	end
-
-	if pl.has_fairy then
-		add(stats, 117)
-	end
-
-	-- draw items to the screen
-	local i = 0
-	for id in all(stats) do
-		draw_to_screen(id, i*10 + x, y)
-		i += 1
-	end
 end
 
 function draw_map(x, y, w, h)
@@ -836,8 +149,11 @@ function make_actor(x, y)
 	-- other.
 	a.hit = function(other) end
 
-	-- gets called if the scene is switching, so the actor would be leaving.
+	-- gets called if the actor is leaving the scene
 	a.unload = function() end
+
+	-- gets called if the actor is entering the scene
+	a.load = function() end
 
 	-- gets called if the actor is out of bounds.
 	a.outside = function(self) end
@@ -1027,140 +343,754 @@ function set_actor_pos(a)
 	a.t += 1
 end
 
-function control_player(pl)
-	-- how fast to accelerate
-	local accel = pl.spd
-	-- move if no bomb/shield or sword.
-	if not btn(4) and not btn(5) then
-		if btn(0) then pl.dx -= accel end
-		if btn(1) then pl.dx += accel end
-		if btn(2) then pl.dy -= accel end
-		if btn(3) then pl.dy += accel end
-	elseif btn(4) then
-		if pl.sword == nil and pl.has_sword then
-			local dir = -1
-			if btn(0) then     dir = 0
-			elseif btn(1) then dir = 1
-			elseif btn(2) then dir = 2
-			elseif btn(3) then dir = 3 end
-
-			if dir != -1 then pl.sword=gen_sword(pl.x, pl.y, dir, pl.has_master) end
-		end
-	elseif btn(5) then
-		if pl.boomerang == nil and pl.has_boomerang then
-			local dir = -1
-
-			if btn(0) and btn(2)     then dir = 4
-			elseif btn(1) and btn(2) then dir = 5
-			elseif btn(1) and btn(3) then dir = 6
-			elseif btn(0) and btn(3) then dir = 7
-			elseif btn(0) then dir = 0
-			elseif btn(1) then dir = 1
-			elseif btn(2) then dir = 2
-			elseif btn(3) then dir = 3 end
-
-			if dir != -1 then pl.boomerang=gen_boomerang(pl.x, pl.y, dir) end
-		end
-	end
-
-	-- play a sound if moving
-	-- (every 4 ticks)
-	if pl.regenerate > 0 then pl.regenerate -= 1 end
-	
-	if (abs(pl.dx)+abs(pl.dy) > 0.1
-					and (pl.t%4) == 0) then
-		-- sfx(1)
-	end
-	
+function offset_x()
+	return -viewx * 8 + 64
 end
 
--- people have states so they may say different things at different times.
-function gen_oldman(x,y, func)
-	local oldie = gen_interactable(x, y)
-	oldie.interact = function() func(oldie) end
-	oldie.spr=97
-	oldie.state=0
-	return oldie
+function offset_y()
+	return -viewy * 8 + 64
 end
 
-function gen_item(x,y, price, spr_ind, func)
-	local item = gen_interactable(x, y)
-	item.spr = spr_ind
-	item.static = true
-	item.price = price
-	item.draw=
-		function(self)
-			draw_text(self.price, item.x-.5, item.y-1.3, 1)
-			draw_actor(self)
-		end
-
-	-- only buy the item if you have enough power orbs.
-	item.interact =
-		function()
-			if power_orb_count >= item.price then
-				if func(item) then
-					power_orb_count -= item.price
-				end
-			else
-				tbox("shopkeeper", "hey, you don't have enough power orbs to buy that!")
-			end
-		end
-
-	return item
-end
-
-function gen_grave(x,y, str)
-	local grave = gen_sign(x, y, str)
-	grave.spr=4
-	return grave
-end
-
--- func is what should happen when the player tries reading the sign.
-function gen_sign(x,y, str)
-	local sign = gen_interactable(x, y)
-	sign.spr = 19
-	sign.interact = function() tbox("", str) end
-	return sign
-end
-
--- things that are operated by pressing z below the object.
-function gen_interactable(x, y, func)
-	local thing = make_actor(x,y)
-	thing.static=true
-	if func != nil then
-		thing.interact=func
+function scene_update()
+	if not tbox_active() then
+		map_update()
+		trigger_update()
+		view_update()
 	else
-		thing.interact=function() end
+		tbox_interact()
 	end
-
-	thing.move=
-		function(self)
-			local x1 = -self.w
-			local x2 =  self.w
-			local y1 =  self.h
-			local y2 =  2.5+self.h
-
-			if is_pl_in_box_rel(self, x1, x2, y1, y2)
-			and btnp(4) then
-				thing.interact()
-			end
-		end
-	return thing
 end
 
--- the parameter is what should happen when the player opens the chest.
-function gen_chest(x,y, func)
-	local chest = gen_interactable(x, y)
-	chest.spr=114
-	chest.interact=
-		function()
-			if chest.spr != 115 then
-				chest.spr = 115
-				sfx(62)
-				func()
+-- triggers are boxes you collide with that can make events happen.
+-- pos is where the player gets teleported to if the trigger is touched.
+function make_trigger(name, x1, y1, x2, y2, pos, mark)
+	local func=nil
+	if mark != nil then
+		func = function() marker=mark end
+	end
+
+	triggers[name] = {box={x1=x1, y1=y1, x2=x2, y2=y2}, active=true, pos=pos, func=func}
+end
+
+-- used for debugging purposes.
+function draw_triggers()
+	for k,v in pairs(triggers) do
+		rect(v.box.x1*8 + offset_x(),
+			  v.box.y1*8 + offset_y(),
+			  v.box.x2*8 + offset_x(),
+			  v.box.y2*8 + offset_y(), 10)
+	end
+end
+
+function trigger_update()
+	for k, v in pairs(triggers) do
+		if v.active and is_pl_in_box(v.box) then
+			v.func()
+			if v.pos != nil then
+				pl.x = v.pos.x
+				pl.y = v.pos.y
 			end
 		end
-	return chest
+	end
+end
+
+-- updates the view with the player's coordinates. call whenever the player
+-- changes position.
+function view_update()
+	viewx = pl.x
+	viewy = pl.y
+end
+
+function title_update()
+	if btnp(4) then
+		marker = "hut"
+	end
+end
+
+-- a super useful function. pass in the sprite id and this will return the
+-- transparency color.
+function get_alt(id)
+	if id == 43 or
+	   id == 44 or
+	   id == 56 or
+	   id == 57 then
+		return 15
+	elseif id == 16 or
+	       id == 27 or
+	       id == 28 or
+	       id == 32 or
+	       id == 48 or
+	       id == 112 or
+	       id == 119 or
+	       id == 113 then
+		return 0
+	end
+
+	-- def is 7 for this game.
+	return 7
+end
+
+function del_if_enemy(enemy)
+	-- all enemies are bad.
+	if enemy.bad then
+		del(actors, enemy)
+	end
+end
+
+function clean_enemies()
+	foreach(actors, del_if_enemy)
+end
+
+-- use right before changing the scene.
+function save_scene()
+	-- should call this on multiple actors eventually.
+	for a in all(actors) do
+		a.unload()
+	end
+	actors = {}
+end
+
+-- use when switching to a new scene.
+-- x and y are the player's new coordinates.
+function load_scene(scene_name)
+	save_scene()
+	actors = scene_actors[scene_name]
+
+	add(actors, pl)
+
+	for a in all(actors) do
+		a.load()
+	end
+
+	view_update()
+
+end
+
+function draw_wrap(x,y,w,h, off)
+	if off == nil then
+		off = 2
+	end
+
+	-- first calculate how many times the loop must go.
+	-- the screen midpoint is 8. so i need to wrap to 8 at least.
+	local count= flr((8-off)/off)
+
+	local offx = -pl.x*8+64
+	local offy = -pl.y*8+64
+
+	-- rest is for wrapping.
+	for i=1, count, 1 do
+		-- left part screen
+		map(x, y, x*8 + -i*8*off + offx, y*8 + offy, off, h)
+
+		-- top part screen
+		map(x, y, x*8 + offx, y*8 + -i*8*off + offy, w, off)
+	end
+
+	for i=0, count-1, 1 do
+		-- right part screen
+		map(x+w - off, y, (x+w)*8 + i*8*off + offx, y*8 + offy, off, h)
+
+		-- bottom part screen
+		map(x, y+h - off, x*8 + offx, (y+h)*8 + i*8*off + offy, w, off)
+	end
+
+	for i=0, count-1, 1 do
+		for j=0, count-1, 1 do
+			-- bl corner
+			map(x, (y+h)-off, x*8 + i*8*off - count*8*off + offx, j*8*off + (y+h)*8 + offy, off, off)
+
+			-- br corner
+			map((x+w)-off, (y+h)-off, i*8*off + (x+w)*8 + offx, j*8*off + (y+h)*8 + offy, off, off)
+
+			-- tr corner
+			map((x+w)-off, y, i*8*off + (x+w)*8 + offx, y*8 + j*8*off - count*8*off + offy, off, off)
+
+			-- tl corner
+			map(x, y, x*8 + i*8*off - count*8*off + offx, y*8 + j*8*off - count*8*off + offy, off, off)
+		end
+	end
+end
+
+------------------
+-- game control!!!
+------------------
+function garbage_collection()
+	foreach(actors,
+		function(a)
+			if a.alive == false then
+				a.destroy()
+				del(actors, a)
+			end
+		end)
+end
+
+function map_update()
+	if pl.alive then
+		move_actors()
+	end
+
+	-- call outside and destroy functions
+	update_outside()
+	garbage_collection()
+end
+
+function dice_roll(sides)
+	return flr(rnd(sides)) == 1
+end
+
+function gen_energy_ball(x,y,dx,dy)
+	local ball = gen_bullet(x,y,dx,dy)
+	ball.spr = 119
+	ball.bad = true
+	ball.deflect = false
+	ball.id = "ball"
+
+	ball.hit=
+		function(other)
+			if other == pl.sword and pl.has_master and ball.good == false then
+				ball.deflect = true
+				ball.good = true
+			end
+		end
+
+	ball.move=function(self)
+		if ball.deflect then 
+			ball.deflect = false
+			ball.dx *= -1
+			ball.dy *= -1
+		end
+	end
+
+	return ball
+end
+
+function gen_canondwarf(x, y)
+	local bad = gen_enemy(x, y)
+	bad.solid = false
+	bad.killed = false
+
+	bad.reset =
+		function()
+			bad.spr = 109
+			bad.dx = 0
+			bad.dy = 0
+			if not bad.killed then
+				bad.x = x
+				bad.y = y
+				bad.hearts = 1
+				bad.state = 0
+				bad.timer = 0
+			end
+			bad.vulnerable = false
+			bad.clock = true
+		end
+
+	bad.unload =
+		function()
+			if not bad.killed then
+				clean_enemies()
+				add(actors, bad)
+				canon.reset()
+			end
+
+			if triggers["canon_intro"].active == false then
+				triggers["canon_resume"].active = true
+			end
+
+			if bad.killed then
+				triggers["canon_resume"].active = false
+			end
+		end
+
+	bad.load =
+		function()
+			music(-1)
+			if not bad.killed then
+				music(53)
+			end
+		end
+
+	bad.reset()
+	bad.tres_text = "trespasser."
+
+	bad.move = canon_move
+
+	bad.hit =
+		function(other)
+			if other.id == "ball" and other.good then
+				other.alive = false
+				if bad.state < 7 then
+					bad.state = 5
+				else
+					bad.state = 9
+					bad.timer = 60
+					gen_skelly(bad.x, bad.y)
+				end
+			elseif other == pl.sword and pl.has_master then
+				if bad.vulnerable then
+					bad.hearts -= 1
+					bad.vulnerable = false
+					if bad.hearts == 3 then
+						bad.state = 7
+					end
+				end
+			end
+
+			if bad.hearts <= 0 and bad.state < 11 then
+				canon_kill(bad)
+			end
+		end
+
+	return bad
+end
+
+function canon_move(self)
+	if self.state == 1 then -- start music
+		music(55)
+		self.state = 2
+		self.timer = 30
+	elseif self.state == 2 then -- move up at start
+		self.dy = -.05
+		self.timer -= 1
+		if self.timer <= 0 then
+			self.state = 3
+			self.timer = 60
+		end
+	elseif self.state == 3 then -- shoot player
+		self.timer -= 1
+		if self.timer <= 0 then
+			self.state = 4
+			self.timer = 120
+		elseif self.timer % 30 == 0 then
+			local ball = gen_energy_ball(self.x,self.y, 0, 0)
+			move_to_player(ball, .3)
+		end
+	elseif self.state == 4 then -- move to player
+		move_to_player(self, .05)
+		self.timer -= 1
+		if self.timer <= 0 then
+			self.state = 3
+			self.timer = 120
+		end
+	elseif self.state == 5 then -- got hit, gen things
+		gen_poe(self.x, self.y)
+		gen_skelly(98.5, 17.5)
+		gen_skelly(109.5, 17.5)
+		gen_skelly(109.5, 2.5)
+		gen_skelly(98.5, 2.5)
+		self.state = 6
+		self.vulnerable = true
+		self.timer = 60
+	elseif self.state == 6 then -- stunned then move to player.
+		self.timer -= 1
+		if self.timer <= 0 then
+			self.vulnerable = false
+			self.state = 4
+			self.timer = 120
+		elseif self.vulnerable == false then -- canon was hit
+			shake()
+		end
+	elseif self.state == 7 then -- second stage
+		shake()
+		local mid_x = 104
+		local mid_y = 8
+		move_to_point(self, .05, 104, 10)
+		-- if reached the center then
+		if self.x < mid_x + 2 and self.x > mid_x - 2 and self.y < mid_y + 2 and self.y > mid_y - 2 then
+			self.timer = 0
+			self.state = 8
+			self.touchable = false
+		end
+	elseif self.state == 8 then
+		if self.clock then
+			move_clockwise(self, 3, 2, 2, self.timer)
+		else
+			move_counter(self, 3, 2, 2, self.timer)
+		end
+		if self.timer % 60 == 0 then
+			local ball = gen_energy_ball(self.x,self.y, 0, 0)
+			move_to_player(ball, .3)
+		end
+		if self.timer % 360 == 0 then
+			gen_skelly(98.5, 17.5)
+			gen_skelly(109.5, 17.5)
+			gen_skelly(109.5, 2.5)
+			gen_skelly(98.5, 2.5)
+		end
+		self.timer += 1
+	elseif self.state == 9 then
+		self.vulnerable = true
+		self.state = 10
+		self.timer = 60
+		gen_skelly(self.x, self.y)
+	elseif self.state == 10 then
+		shake()
+		self.clock = not self.clock
+		if self.timer <= 0 then
+			self.vulnerable = false
+			self.state = 7
+		elseif self.vulnerable == false then -- canon was hit
+			shake()
+		end
+		self.timer -= 1
+	elseif self.state == 11 then -- defeated
+	end
+end
+
+function canon_kill(bad)
+	bad.state = 11
+	music(-1)
+
+	bad.killed = true
+	bad.bad = false
+	bad.static = true
+
+	-- canon is killed now, no need to re-add him after enemies are cleaned.
+	clean_enemies()
+
+	bad.move=actor_interact
+	bad.interact =
+		function()
+			tbox("canondwarf", "yer such a meanie!!!")
+		end
+
+	-- make zelda
+	mset(101, 2, 98)
+	mset(102, 2, 99)
+	gen_zeldo(102, 3.5)
+
+	ivan_reveal_cutscene()
+end
+
+function ivan_reveal_cutscene()
+	ivan_revealed = true
+	tbox("canondwarf", "you beat me. that hurt.")
+	tbox("zeldo", "lank, why did you beat up canondwarf?")
+	tbox("zeldo", "we were just about to have a tea party.")
+	tbox("ivan", "haha. ha. ha.")
+	tbox("ivan", "mwahahahahaha.")
+end
+-- draws how many power orbs have been collected.
+function draw_power_orbs(x, y)
+	-- hearts on right of screen
+	draw_to_screen(55, x-1, y-1)
+	print(power_orb_count, x+8, y+1, 7)
+end
+
+-- draws the various items that have been collected so far.
+function draw_items(x, y)
+	local stats = {}
+
+	if pl.has_sword then
+		if pl.has_master then
+			add(stats, 43)
+		else
+			add(stats, 56)
+		end
+	end
+
+	if pl.has_boomerang then
+		add(stats, 54)
+	end
+
+	if pl.has_fairy then
+		add(stats, 117)
+	end
+
+	-- draw items to the screen
+	local i = 0
+	for id in all(stats) do
+		draw_to_screen(id, i*10 + x, y)
+		i += 1
+	end
+end
+
+
+
+function draw_text(text, x, y, col)
+	local sx = (x * 8) + offset_x()
+	local sy = (y * 8) + offset_y()
+
+	print(text, sx, sy, col)
+end
+
+-- a utility function for drawing actors to the screen. auto offsets and
+-- assumes white is the default background color.
+function draw_actor(a, w, h, flip_x, flip_y)
+	if a.alive then
+		local sx = (a.x * 8) + offset_x() - a.sw/2
+		local sy = (a.y * 8) + offset_y() - a.sh/2
+
+		if w == nil then w = 1 end
+		if h == nil then h = 1 end
+		if flip_x == nil then flip_x = false end
+		if flip_y == nil then flip_y = false end
+
+		local alt = get_alt(a.spr)
+		palt(alt,true)
+		spr(a.spr + a.frame, sx, sy, w, h, flip_x, flip_y)
+		palt(alt,false)
+	end
+end
+
+local rnd_x = 0
+local rnd_y = 1
+function draw_title()
+	cls(0)
+	local col = 10 --global_time / 60 % 16
+	if global_time % 120 == 0 then
+		rnd_x = flr(rnd(6))
+		rnd_y = flr(rnd(4))
+	end
+
+	viewx = 16 * rnd_x + 8
+	viewy = 16 * rnd_y + 8
+
+	map(viewx - 8, viewy - 8, 0,0,16,16)
+
+	draw_things()
+
+	-- draw the title
+	for i=0,7,1 do
+		draw_to_screen(72+i,4*8+i*8,7*8)
+		draw_to_screen(88+i,4*8+i*8,8*8)
+	end
+
+	print("the story of", 41, 50, col)
+	if global_time % 30 < 20 then
+		print("press z to start", 32, 72, 7)
+	end
+end
+
+function draw_things()
+	for a in all(actors) do
+		if a.visible then
+			a.draw(a)
+		end
+	end
+end
+
+function draw_to_screen(id, x, y)
+	local alt = get_alt(id)
+	palt(alt,true)
+	spr(id, x, y)
+	palt(alt,false)
+end
+
+fairy_counter=0
+fairy_clockwise=false
+function draw_fairy()
+	local x = 64 + 8 * cos(fairy_counter) - 4
+	local y = 64 + 8 * sin(fairy_counter) - 4
+	draw_to_screen(107, x, y)
+
+	if time() % 20 == 0 then
+		fairy_clockwise=not fairy_clockwise
+	end
+
+	if fairy_clockwise then
+		fairy_counter -= rnd(.01)
+	else
+		fairy_counter += rnd(.01)
+	end
+		
+	if fairy_counter > 1 then
+		fairy_counter -= 1
+	elseif fairy_counter < 0 then
+		fairy_counter += 1
+	end
+end
+
+death_link_counter=0
+function draw_link_death()
+	local yoff = sin(time() / 4 + .2)
+	local ind = 104
+
+	death_link_counter += 1
+		if death_link_counter > 7*30 then
+			ind = 102
+		elseif death_link_counter > 5*30 then
+			ind = 103
+		end
+
+	draw_to_screen(ind, 128/2 - 4, yoff + 128/2 - 4)
+end
+
+
+-- fades the game to black then prints game over.
+game_over_timer = 5
+game_over_fadein = 3
+function draw_game_over()
+
+	local yoff = sin(time() / 8)
+	local fade_ind=58
+	if game_over_timer > 0 then
+		if time() % 1 == 0 then
+			game_over_timer -= 1
+		end
+	elseif game_over_timer == 0 and game_over_fadein > 0 then
+		if time() % 1 == 0 then
+			game_over_fadein -= 1
+		end
+	end
+
+	for i=0,120,8 do
+		for j=0,120,8 do
+			draw_to_screen(fade_ind+game_over_timer, i, j)
+		end
+	end
+
+	if game_over_fadein <= 2 then
+		print("game over", 46, 47+yoff, 7 - game_over_fadein)
+		print("reset cart to play again", 16, 77+yoff, 7 - game_over_fadein)
+	end
+
+end
+
+
+-- draws the hearts, but from the right.
+function draw_hearts(x, y)
+	-- hearts on right of screen
+	for i=0, pl.hearts-1, 1 do
+		draw_to_screen(35, x-8*(i+1), y-1)
+	end
+end
+
+function gen_deku(x, y)
+	local bad = gen_enemy(x, y)
+	bad.spr = 70
+
+	-- deku shoots every so often.
+	bad.move =
+		function(a)
+			if a.t % 60 == 0 then
+				local dx = -.4
+				if a.x < pl.x then
+					dx = .4
+				end
+				gen_deku_bullet(a.x,a.y,dx,0)
+			end
+		end
+
+	return bad
+end
+
+function gen_skelly(x, y)
+	local bad = gen_enemy(x, y)
+	bad.spr = 68
+	bad.move = function(self) move_to_player(self, .1) end
+	bad.inertia = 0
+	return bad
+end
+
+function gen_deku_bullet(x,y,dx,dy)
+	local bad = gen_bullet(x,y,dx,dy)
+	bad.spr = 71
+	return bad
+end
+
+function gen_poe(x, y)
+	local bad = gen_enemy(x, y)
+	bad.spr = 116
+	bad.solid = false
+	bad.touchable = false
+	bad.move = function(self) move_counter(self, 4, 5, 5, self.t) end
+	bad.draw =
+		function(a)
+			draw_actor(a, nil, nil, a.dx > 0, nil)
+		end
+	return bad
+end
+
+function gen_dark_link(x, y)
+	local bad = gen_enemy(x, y)
+	bad.spr = 124
+	return bad
+end
+
+function gen_octorok(x, y)
+	local bad = gen_enemy(x, y)
+	bad.spr = 86
+	return bad
+end
+
+function gen_enemy(x, y)
+	local bad = make_actor(x, y)
+	bad.spr = 1
+	bad.dx=0
+	bad.dy=0
+	bad.inertia=.5
+	bad.bad=true
+	bad.hearts=0
+	bad.solid=true
+	bad.move = function(self) end
+	bad.hit=
+		function(other)
+			if other == pl.boomerang then
+				bad.stun = 30
+			end
+
+			if other.good then
+				bad.alive = false
+			end
+		end
+
+	bad.destroy =
+		function(self)
+			local col = nil
+			-- smaller chance you get a heart.
+			if dice_roll(5) then
+				col = gen_heart(bad.x, bad.y)
+			else
+				col = gen_power_orb(bad.x, bad.y)
+			end
+			
+			col.dx = bad.dx*3
+			col.dy = bad.dy*3
+		end
+
+	-- enemy faces player, assumes sprite is facing left
+	bad.draw =
+		function(a)
+			draw_actor(a, nil, nil, a.x < pl.x, nil)
+		end
+
+	return bad
+end
+
+
+function gen_bullet(x,y,dx,dy)
+	local bad = gen_enemy(x,y)
+	if dx == nil then dx = 0 end
+	if dy == nil then dy = 0 end
+	bad.dx = dx
+	bad.dy = dy
+	bad.inertia=1
+	bad.solid=false
+	bad.touchable=false
+	bad.destroy=function(self) end
+	-- die if the bullet is out of bounds.
+	bad.outside=
+		function(a)
+			a.alive = false
+		end
+
+	-- rotate the bullet
+	bad.draw=
+		function(a)
+			if a.t % 40 < 10 then
+				draw_actor(a, nil, nil, false, false)
+			elseif a.t % 30 < 10 then
+				draw_actor(a, nil, nil, false, true)
+			elseif a.t % 20 < 10 then
+				draw_actor(a, nil, nil, true, true)
+			elseif a.t % 10 < 10 then
+				draw_actor(a, nil, nil, true, false)
+			end
+		end
+
+	return bad
 end
 
 function gen_boomerang(x, y, dir)
@@ -1332,43 +1262,393 @@ function gen_sword(x, y, dir, master)
 
 	return sword
 end
+function make_lost_woods(path_len)
+	actors = {}
+	gen_sign(100.5,46.5, "don't get lost!")
 
-function offset_x()
-	return -viewx * 8 + 64
+	scene_actors[get_lost_name(1)] = actors
+	actors = {}
+
+	for i=2, path_len do
+		gen_lost_actors(i, path_len)
+	end
+
+	local path = make_lost_path(path_len)
+	lost_woods_triggers(path)
 end
 
-function offset_y()
-	return -viewy * 8 + 64
+function gen_lost_actors(path_num, path_len)
+	actors = {}
+
+	gen_skelly(102,50)
+
+	scene_actors[get_lost_name(path_num)] = actors
+	actors = {}
 end
 
-function draw_text(text, x, y, col)
-	local sx = (x * 8) + offset_x()
-	local sy = (y * 8) + offset_y()
+-- returns the list of path directions.
+function make_lost_path(path_len)
+	-- can't have a path that allows you to go right then left.
+	-- if 0 then 0 or 1. if 2 then 1 or 2.
+	local lost_woods_path = {}
+	local prev_num = 1
 
-	print(text, sx, sy, col)
+	for i=1, path_len-1 do
+		local new_num = 1
+
+		if prev_num == 0 then
+			new_num = flr(rnd(2))
+		elseif prev_num == 1 then
+			new_num = flr(rnd(3))
+		else -- must be 2
+			new_num = flr(rnd(2)) + 1
+		end
+			
+		add(lost_woods_path, new_num)
+		prev_num = new_num
+	end
+
+	add(lost_woods_path, 1)
+	return lost_woods_path
 end
 
--- a utility function for drawing actors to the screen. auto offsets and
--- assumes white is the default background color.
-function draw_actor(a, w, h, flip_x, flip_y)
-	if a.alive then
-		local sx = (a.x * 8) + offset_x() - a.sw/2
-		local sy = (a.y * 8) + offset_y() - a.sh/2
+-- a utility function to make a trigger in one of the three lost woods directions
+-- used in make_wrong_exit, make_right_exit, and make_final_exit.
+-- 0 = left, 1 = up, 2 = right
+function make_lost_dir_trigger(str, dir)
+	if dir == 0 then
+		make_trigger(str, 96, 48, 97, 52, {x=106.5, y=50})
+	elseif dir == 1 then
+		make_trigger(str, 100, 44, 104, 45, {x=102, y=54.5})
+	else -- dir is 2
+		make_trigger(str, 107, 48, 108, 52, {x=97.5, y=50})
+	end
+	triggers[str].active = false
+end
 
-		if w == nil then w = 1 end
-		if h == nil then h = 1 end
-		if flip_x == nil then flip_x = false end
-		if flip_y == nil then flip_y = false end
+function get_lost_name(room_num)
+	return "lost_woods_"..room_num
+end
 
-		local alt = get_alt(a.spr)
-		palt(alt,true)
-		spr(a.spr + a.frame, sx, sy, w, h, flip_x, flip_y)
-		palt(alt,false)
+function get_lost_right_name(room_num)
+	return "lost_woods_"..room_num.."_right"
+end
+
+function get_lost_wrong1_name(room_num)
+	return "lost_woods_"..room_num.."_wrong_1"
+end
+
+function get_lost_wrong2_name(room_num)
+	return "lost_woods_"..room_num.."_wrong_2"
+end
+
+-- pass in true to make the room active, or false to make it inactive.
+function toggle_lost_room_str(room_name, active)
+	local str1 = room_name.."_wrong_1"
+	local str2 = room_name.."_wrong_2"
+	local str3 = room_name.."_right"
+
+	triggers[str1].active = active
+	triggers[str2].active = active
+	triggers[str3].active = active
+end
+
+function toggle_lost_room(room_num, active)
+	local str1 = get_lost_wrong1_name(room_num)
+	local str2 = get_lost_wrong2_name(room_num)
+	local str3 = get_lost_right_name(room_num)
+
+	if room_num > 0 then
+		triggers[str1].active = active
+		triggers[str2].active = active
+		triggers[str3].active = active
 	end
 end
 
-function dice_roll(sides)
-	return flr(rnd(sides)) == 1
+-- switches the triggers. if either are 0, then nothing happens for that one.
+function switch_lost_room(cur_num, nxt_num)
+	toggle_lost_room(cur_num, false)
+	toggle_lost_room(nxt_num, true)
+	marker = get_lost_name(nxt_num)
+end
+
+-- there are only two wrongs. 1 and 2.
+function make_wrong_exits(path_num, dir1, dir2)
+	local str1 = get_lost_wrong1_name(path_num)
+	local str2 = get_lost_wrong2_name(path_num)
+
+	make_lost_dir_trigger(str1, dir1)
+	make_lost_dir_trigger(str2, dir2)
+
+	local reset_func=
+		function()
+			-- go to the first lost room.
+			switch_lost_room(path_num, 1)
+		end
+
+	triggers[str1].func = reset_func
+	triggers[str2].func = reset_func
+end
+
+function make_right_exit(path_num, dir)
+	local str = get_lost_right_name(path_num)
+	local nxt = get_lost_name(path_num+1)
+	make_lost_dir_trigger(str, dir)
+
+	triggers[str].func =
+		function()
+			-- go to next room
+			switch_lost_room(path_num, path_num+1)
+		end
+end
+
+function make_final_exit(path_num, dir)
+	local str = get_lost_right_name(path_num)
+	make_lost_dir_trigger(str, dir)
+	triggers[str].pos = {x=118,y=54.5}
+
+	triggers[str].func =
+		function()
+			-- get rid of last one and enable first one.
+			toggle_lost_room(path_num, false)
+			toggle_lost_room(1, true)
+			marker = "sacred"
+		end
+end
+
+-- assumes the items in lost woods path are a 0, 1, or 2
+function lost_woods_triggers(lost_woods_path)
+	local str_exit = "lost_woods_exit"
+	make_trigger(str_exit, 100,  55, 104,  56, {x=32, y=1.5})
+	triggers[str_exit].func =
+		function()
+			toggle_lost_room_str(marker, false)
+			toggle_lost_room(1, true)
+			marker = "overworld"
+		end
+
+	-- the keys are indexes like an array
+	for k,v in pairs(lost_woods_path) do
+		if k == #lost_woods_path then
+			make_final_exit(k, v)
+		else
+			make_right_exit(k, v)
+		end
+
+		make_wrong_exits(k, (v+1)%3, (v+2)%3)
+	end
+
+	toggle_lost_room(1, true) -- make the first lost room enabled at the start.
+end
+
+
+function make_map()
+	actors = {}
+
+	gen_sign(34.5, 17.5, "the square force has protected the land of hiroll for ages.")
+	gen_chest(40.5, 7.5, 
+		function()
+			heart_container()
+		end)
+
+	gen_sign(9.5,5.5, "lank's house")
+
+	gen_sign(14.5,48.5, "old man's house")
+	gen_grave(17.5,48.5, "here lies an even older man. i love you dad. :)")
+
+	gen_oldman(31.5, 2.5,
+		function(self)
+			if self.state == 0 then
+				if power_orb_count >= 50 then
+					tbox("old man", "oh, you have 50 power orbs. i'll take those. hehe.")
+					power_orb_count -= 50
+					mset(32,2,3) -- set the block to grass.
+					self.state = 1
+				else
+					tbox("old man", "a powerful sword along with powerful enemies lie beyond here.")
+					tbox("old man", "come back when you've collected 50 power orbs.")
+				end
+			else
+				tbox("old man", "thanks for the orbs.")
+			end
+		end)
+
+	-- things from alpha
+	gen_poe(57.5,10.5)
+	gen_poe(8, 9.5)
+	gen_enemies()
+
+	scene_actors["overworld"] = actors
+	actors = {}
+end
+
+function make_hut(prev_marker)
+	actors = {}
+
+	scene_actors["hut"] = actors
+	actors = {}
+end
+
+function make_sacred(prev_marker)
+	actors = {}
+
+	gen_chest(119.5, 36.5,
+		function()
+			heart_container()
+		end)
+
+	gen_sign(116.5, 36.5, "only the hero of hiroll can wield this sword.")
+	gen_sword_stand(118, 36.5)
+
+	scene_actors["sacred"] = actors
+	actors = {}
+end
+
+function make_old(prev_marker)
+	actors = {}
+
+	gen_sign(97.5, 39.5, "that chest holds all that is left of my father. please don't open the it.")
+	gen_chest(99.5, 39.5,
+		function()
+			pl.has_boomerang = true
+			tbox("", "you found a boomerang!")
+			tbox("", "hold x then press an arrow key to use it.")
+		end)
+
+	scene_actors["old"] = actors
+	actors = {}
+end
+
+function make_boss(prev_marker, x, y)
+	actors = {}
+
+	canon = gen_canondwarf(104,3.5)
+	gen_chest(100.5, 2.5,
+		function()
+			power_orb_count += 49
+			canon.tres_text = "theif."
+
+			tbox("", "you found 49 power orbs. canondwarf doesn't deserve these anyway.")
+			tbox("canondwarf", "oh now you steal from me. i'll never forgive you for this.")
+		end)
+	gen_sign(107.5, 2.5, "cages are reserved for special guests.")
+
+	make_trigger("canon_intro",  100,  1,     108,  9)
+	make_trigger("canon_resume", 100,  1,     108,  9)
+
+	make_trigger("boss_enter",   87,   3,     89,   4.5,  {x=104,  y=19.5}, "boss")
+	make_trigger("boss_exit",    101,  20,    107,  21,   {x=88, y=4.5},  "overworld")
+
+	triggers["canon_resume"].active = false
+
+	triggers["boss_exit"].func =
+		function()
+			marker = "overworld"
+		end
+
+	triggers["canon_resume"].func =
+		function()
+			music(-1)
+			tbox("canondwarf", "mwahahahahahahahahahaha.")
+			tbox("canondwarf", "i see you're back. you'll pay you little "..canon.tres_text)
+			sfx(59)
+			canon.spr = 108
+			canon.state = 1
+			triggers["canon_resume"].active=false
+		end
+
+	triggers["canon_intro"].func =
+		function()
+			music(-1)
+			tbox("canondwarf", "mwahahahahahahahahahaha.")
+			tbox("canondwarf", "who are you?")
+			tbox("lank", "i'm lank.")
+			tbox("zeldo", "lank you're here! i have to tell you something. don't listen to-")
+			tbox("canondwarf", "be quiet princess! i'm going to take care of this trespasser.")
+			sfx(59)
+			canon.spr = 108
+			canon.state = 1
+			triggers["canon_intro"].active=false
+		end
+
+	scene_actors["boss"] = actors
+	actors = {}
+end
+
+function make_shop(prev_marker, x, y)
+	actors = {}
+
+	gen_oldman(106.5, 35.5,
+		function(self)
+			if self.state == 0 then
+				tbox("shopkeeper", "i love selling things.")
+				tbox("shopkeeper", "press z below one of the items to buy it.")
+			end
+		end)
+
+	gen_item(103.5, 38.5, 50, 117,
+		function(item)
+			if not pl.has_fairy then
+				tbox("", "you got a fairy in a bottle.")
+				tbox("", "it will heal you if you've lost all your hearts.")
+				pl.has_fairy = true
+				item.alive = false
+				return true
+			else
+				return false
+			end
+		end)
+
+	gen_item(106.5, 38.5, 49, 56,
+		function(item)
+			if not pl.has_sword then
+				tbox("", "you got a sword.")
+				tbox("", "hold z then press an arrow key to use it.")
+				pl.has_sword = true
+				item.alive = false
+				return true
+			else
+				return false
+			end
+		end)
+
+	gen_item(109.5, 38.5, 50, 118,
+		function(item)
+			heart_container()
+			item.alive = false
+			return true
+		end)
+
+	scene_actors["shop"] = actors
+	actors = {}
+end
+
+function make_scenes()
+	make_map()
+	make_hut()
+	make_shop()
+	make_boss()
+	make_old()
+	make_lost_woods(5) -- how long the woods are
+	make_sacred()
+end
+
+-----------------
+-- enemy creation
+-----------------
+function gen_enemies()
+	for i=0, 25, 1 do
+		local x = rnd(93-18)+18.5
+		local y = rnd(43) + 2.5
+		local id = flr(rnd(3))
+		if id == 0 then
+			gen_octorok(x, y)
+		elseif id == 1 then
+			gen_deku(x, y)
+		elseif id == 2 then
+			gen_skelly(x, y)
+		end
+	end
 end
 
 -- if given a tile number that is blank, this will return the other version of
@@ -1398,157 +1678,191 @@ function gen_grass()
 		end
 	end
 end
-
-function draw_wrap(x,y,w,h, off)
-	if off == nil then
-		off = 2
-	end
-
-	-- first calculate how many times the loop must go.
-	-- the screen midpoint is 8. so i need to wrap to 8 at least.
-	local count= flr((8-off)/off)
-
-	local offx = -pl.x*8+64
-	local offy = -pl.y*8+64
-
-	-- rest is for wrapping.
-	for i=1, count, 1 do
-		-- left part screen
-		map(x, y, x*8 + -i*8*off + offx, y*8 + offy, off, h)
-
-		-- top part screen
-		map(x, y, x*8 + offx, y*8 + -i*8*off + offy, w, off)
-	end
-
-	for i=0, count-1, 1 do
-		-- right part screen
-		map(x+w - off, y, (x+w)*8 + i*8*off + offx, y*8 + offy, off, h)
-
-		-- bottom part screen
-		map(x, y+h - off, x*8 + offx, (y+h)*8 + i*8*off + offy, w, off)
-	end
-
-	for i=0, count-1, 1 do
-		for j=0, count-1, 1 do
-			-- bl corner
-			map(x, (y+h)-off, x*8 + i*8*off - count*8*off + offx, j*8*off + (y+h)*8 + offy, off, off)
-
-			-- br corner
-			map((x+w)-off, (y+h)-off, i*8*off + (x+w)*8 + offx, j*8*off + (y+h)*8 + offy, off, off)
-
-			-- tr corner
-			map((x+w)-off, y, i*8*off + (x+w)*8 + offx, y*8 + j*8*off - count*8*off + offy, off, off)
-
-			-- tl corner
-			map(x, y, x*8 + i*8*off - count*8*off + offx, y*8 + j*8*off - count*8*off + offy, off, off)
-		end
-	end
+-----------------
+-- movement functions
+-----------------
+function move_clockwise(a, spd, radx, rady, timer)
+	local ang = -timer / 30 / spd
+	a.dx = radx * spd * cos(ang) / 30
+	a.dy = rady * spd * sin(ang) / 30
 end
 
-------------------
--- game control!!!
-------------------
-function garbage_collection()
-	foreach(actors,
-		function(a)
-			if a.alive == false then
-				a.destroy()
-				del(actors, a)
+-- assumes that when timer is zero, you are at the top of the circle.
+function move_counter(a, spd, radx, rady, timer)
+	local ang = timer / 30 / spd + .5
+	a.dx = radx * cos(ang) / 30
+	a.dy = rady * sin(ang) / 30
+end
+
+function move_vertical(a)
+	local slow = 4*30
+	a.dy = a.rady * sin(a.t / slow) / 30
+end
+
+function move_horizontal(a)
+	local slow = 4*30
+	a.dx = a.radx * cos(a.t / slow) / 30
+end
+
+function move_to_point(a, spd, x, y)
+	local ang = atan2(x - a.x, y - a.y)
+	a.dx = spd * cos(ang)
+	a.dy = spd * sin(ang)
+end
+
+function move_to_player(a, spd)
+	move_to_point(a, spd, pl.x, pl.y)
+end
+
+function move_from_player(a)
+	local slow = 2
+	local ang = atan2(a.x - pl.x, a.y - pl.y)
+	a.dx = a.radx * cos(ang) / 30 / slow
+	a.dy = a.rady * sin(ang) / 30 / slow
+end
+-- the parameter is what should happen when the player opens the chest.
+function gen_chest(x,y, func)
+	local chest = gen_interactable(x, y)
+	chest.spr=114
+	chest.interact=
+		function()
+			if chest.spr != 115 then
+				chest.spr = 115
+				sfx(62)
+				func()
 			end
-		end)
-end
-
-function map_update()
-	if pl.alive then
-		move_actors()
-	end
-
-	-- call outside and destroy functions
-	update_outside()
-	garbage_collection()
-end
-
-local rnd_x = 0
-local rnd_y = 1
-function draw_title()
-	cls(0)
-	local col = 10 --global_time / 60 % 16
-	if global_time % 120 == 0 then
-		rnd_x = flr(rnd(6))
-		rnd_y = flr(rnd(4))
-	end
-
-	viewx = 16 * rnd_x + 8
-	viewy = 16 * rnd_y + 8
-
-	map(viewx - 8, viewy - 8, 0,0,16,16)
-
-	draw_things()
-
-	-- draw the title
-	for i=0,7,1 do
-		draw_to_screen(72+i,4*8+i*8,7*8)
-		draw_to_screen(88+i,4*8+i*8,8*8)
-	end
-
-	print("the story of", 41, 50, col)
-	if global_time % 30 < 20 then
-		print("press z to start", 32, 72, 7)
-	end
-end
-
-function draw_things()
-	for a in all(actors) do
-		if a.visible then
-			a.draw(a)
 		end
-	end
+	return chest
 end
 
-function draw_to_screen(id, x, y)
-	local alt = get_alt(id)
-	palt(alt,true)
-	spr(id, x, y)
-	palt(alt,false)
+function gen_grave(x,y, str)
+	local grave = gen_sign(x, y, str)
+	grave.spr=4
+	return grave
 end
 
-fairy_counter=0
-fairy_clockwise=false
-function draw_fairy()
-	local x = 64 + 8 * cos(fairy_counter) - 4
-	local y = 64 + 8 * sin(fairy_counter) - 4
-	draw_to_screen(107, x, y)
+-- func is what should happen when the player tries reading the sign.
+function gen_sign(x,y, str)
+	local sign = gen_interactable(x, y)
+	sign.spr = 19
+	sign.interact = function() tbox("", str) end
+	return sign
+end
 
-	if time() % 20 == 0 then
-		fairy_clockwise=not fairy_clockwise
-	end
+-- people have states so they may say different things at different times.
+function gen_oldman(x,y, func)
+	local oldie = gen_interactable(x, y)
+	oldie.interact = function() func(oldie) end
+	oldie.spr=97
+	oldie.state=0
+	return oldie
+end
 
-	if fairy_clockwise then
-		fairy_counter -= rnd(.01)
+function gen_item(x,y, price, spr_ind, func)
+	local item = gen_interactable(x, y)
+	item.spr = spr_ind
+	item.static = true
+	item.price = price
+	item.draw=
+		function(self)
+			draw_text(self.price, item.x-.5, item.y-1.3, 1)
+			draw_actor(self)
+		end
+
+	-- only buy the item if you have enough power orbs.
+	item.interact =
+		function()
+			if power_orb_count >= item.price then
+				if func(item) then
+					power_orb_count -= item.price
+				end
+			else
+				tbox("shopkeeper", "hey, you don't have enough power orbs to buy that!")
+			end
+		end
+
+	return item
+end
+
+
+-- things that are operated by pressing z below the object.
+function gen_interactable(x, y, func)
+	local thing = make_actor(x,y)
+	thing.static=true
+	if func != nil then
+		thing.interact=func
 	else
-		fairy_counter += rnd(.01)
+		thing.interact=function() end
 	end
-		
-	if fairy_counter > 1 then
-		fairy_counter -= 1
-	elseif fairy_counter < 0 then
-		fairy_counter += 1
+
+	thing.move=actor_interact
+
+	return thing
+end
+
+function actor_interact(self)
+	local x1 = -self.w
+	local x2 =  self.w
+	local y1 =  self.h
+	local y2 =  2.5*self.h
+
+	if is_pl_in_box_rel(self, x1, x2, y1, y2)
+	and btnp(4) then
+		self.interact()
 	end
 end
 
-death_link_counter=0
-function draw_link_death()
-	local yoff = sin(time() / 4 + .2)
-	local ind = 104
+-- what happens when you find a heart container.
+function heart_container()
+	tbox("", "you got a heart container.")
+	tbox("", "your max health is now increased by one.")
+	pl.max_hearts += 1
+	pl.hearts = pl.max_hearts
 
-	death_link_counter += 1
-		if death_link_counter > 7*30 then
-			ind = 102
-		elseif death_link_counter > 5*30 then
-			ind = 103
+end
+
+function gen_collectable(x, y)
+	local collectable = make_actor(x, y)
+	collectable.hit_boom = false
+	collectable.inertia = 0
+	collectable.touchable = false
+	collectable.solid = false
+
+	-- use a closure!
+	collectable.hit=
+		function(other)
+			-- only collision with player if not hit boomerang.
+			if other == pl and not collectable.hit_boom then
+				collectable.alive = false
+			elseif other == pl.boomerang and not collectable.hit_boom then
+				collectable.hit_boom = true
+				other.collect(collectable)
+			end
 		end
 
-	draw_to_screen(ind, 128/2 - 4, yoff + 128/2 - 4)
+	return collectable
+end
+
+function gen_heart(x,y)
+	local heart = gen_collectable(x,y)
+	heart.spr = 35
+
+	heart.destroy =
+		function(self)
+			pl.heal()
+		end
+	return heart
+end
+
+function gen_power_orb(x, y)
+	local orb = gen_collectable(x,y)
+	orb.spr = 55
+
+	orb.destroy =
+		function(self)
+			power_orb_count += 1
+		end
+	return orb
 end
 
 function gen_sword_stand(x, y)
@@ -1587,6 +1901,69 @@ function gen_sword_stand(x, y)
 		function(a)
 			draw_actor(a, 2, 1, nil, nil)
 		end
+end
+function gen_zeldo(x, y)
+	local girl = gen_interactable(x, y)
+
+	girl.spr = 120
+	girl.bounce = .1
+	girl.good=true
+	girl.static=true
+
+	girl.interact =
+		function()
+			tbox("zeldo", "you must find and defeat ivan.")
+		end
+
+	return girl
+end
+power_orb_count = 0
+
+function control_player(pl)
+	-- how fast to accelerate
+	local accel = pl.spd
+	-- move if no bomb/shield or sword.
+	if not btn(4) and not btn(5) then
+		if btn(0) then pl.dx -= accel end
+		if btn(1) then pl.dx += accel end
+		if btn(2) then pl.dy -= accel end
+		if btn(3) then pl.dy += accel end
+	elseif btn(4) then
+		if pl.sword == nil and pl.has_sword then
+			local dir = -1
+			if btn(0) then     dir = 0
+			elseif btn(1) then dir = 1
+			elseif btn(2) then dir = 2
+			elseif btn(3) then dir = 3 end
+
+			if dir != -1 then pl.sword=gen_sword(pl.x, pl.y, dir, pl.has_master) end
+		end
+	elseif btn(5) then
+		if pl.boomerang == nil and pl.has_boomerang then
+			local dir = -1
+
+			if btn(0) and btn(2)     then dir = 4
+			elseif btn(1) and btn(2) then dir = 5
+			elseif btn(1) and btn(3) then dir = 6
+			elseif btn(0) and btn(3) then dir = 7
+			elseif btn(0) then dir = 0
+			elseif btn(1) then dir = 1
+			elseif btn(2) then dir = 2
+			elseif btn(3) then dir = 3 end
+
+			if dir != -1 then pl.boomerang=gen_boomerang(pl.x, pl.y, dir) end
+		end
+	end
+
+	-- play a sound if moving
+	-- (every 4 ticks)
+	if pl.regenerate > 0 then pl.regenerate -= 1 end
+	
+	if (abs(pl.dx)+abs(pl.dy) > 0.1
+					and (pl.t%4) == 0) then
+		-- sfx(1)
+	end
+	
 end
 
 function gen_link(x, y)
@@ -1667,472 +2044,169 @@ function gen_link(x, y)
 	return pl
 end
 
------------------
--- enemy creation
------------------
-function gen_enemies()
-	for i=0, 25, 1 do
-		local x = rnd(93-18)+18.5
-		local y = rnd(43) + 2.5
-		local id = flr(rnd(3))
-		if id == 0 then
-			gen_octorok(x, y)
-		elseif id == 1 then
-			gen_deku(x, y)
-		elseif id == 2 then
-			gen_skelly(x, y)
-		end
+------------------------------------------------------------------------------
+-- screen shake implementation, taken from https://github.com/jessemillar/pico-8
+-- slightly modified
+------------------------------------------------------------------------------
+function shake(reset) -- shake the screen
+	camera(0,0) -- reset to 0,0 before each shake so we don't drift
+
+	if not reset then -- if the param is true, don't shake, just reset the screen to default
+		camera(flr(rnd(2)-1),flr(rnd(2)-1)) -- define shake power here (-1 to shake equally in all directions)
 	end
 end
 
-function gen_collectable(x, y)
-	local collectable = make_actor(x, y)
-	collectable.hit_boom = false
-	collectable.inertia = 0
-	collectable.touchable = false
-	collectable.solid = false
+ivan_revealed = false
 
-	-- use a closure!
-	collectable.hit=
-		function(other)
-			-- only collision with player if not hit boomerang.
-			if other == pl and not collectable.hit_boom then
-				collectable.alive = false
-			elseif other == pl.boomerang and not collectable.hit_boom then
-				collectable.hit_boom = true
-				other.collect(collectable)
-			end
+function make_triggers()
+	-- trigger positions
+	make_trigger("no_sword",     7,    10,    9,    12)
+	make_trigger("no_sword",     7,    10,    9,    12)
+	make_trigger("steal"   ,     97,   39,    100,  42)
+	make_trigger("hut_start",    97,   33,    100,  36)
+	make_trigger("mast_intro",   115,  37,    121,  41)
+
+	make_trigger("hut_enter",    7,    4.5,   9,    5.5,  {x=98.5,    y=36.5}, "hut")
+	make_trigger("old_enter",    15,   47.5,  17,   48.5, {x=98.5,    y=42.5}, "old")
+	make_trigger("shop_enter",   29,   55.5,  31,   56.5, {x=106.5,   y=42.5}, "shop")
+	make_trigger("lost_enter",   31,   0,     33,   1,    {x=102,     y=54.5}, get_lost_name(1))
+
+	make_trigger("hut_exit",    97,   37,    100,  38,   {x=8,    y=5.5},  "overworld")
+	make_trigger("old_exit",    97,   43,    100,  44,   {x=16,   y=48.5}, "overworld")
+	make_trigger("shop_exit",   104,  43,    109,  44,   {x=29.5, y=56.5}, "overworld")
+	make_trigger("sacred_exit", 116,  55,    120,  56,   {x=32.5, y=1.5},  "overworld")
+
+	-- start out false
+
+	triggers["mast_intro"].func =
+		function()
+			tbox("ivan", "yes. lank, once you wield this, you can finally defeat canondwarf. haha!")
+			tbox("lank", "wow, i think i can do this.")
+			triggers["mast_intro"].active=false
 		end
 
-	return collectable
-end
-
-function gen_heart(x,y)
-	local heart = gen_collectable(x,y)
-	heart.spr = 35
-
-	heart.destroy =
-		function(self)
-			pl.heal()
-		end
-	return heart
-end
-
-function gen_power_orb(x, y)
-	local orb = gen_collectable(x,y)
-	orb.spr = 55
-
-	orb.destroy =
-		function(self)
-			power_orb_count += 1
-		end
-	return orb
-end
-
-function gen_enemy(x, y)
-	local bad = make_actor(x, y)
-	bad.spr = 1
-	bad.dx=0
-	bad.dy=0
-	bad.inertia=.5
-	bad.bad=true
-	bad.hearts=0
-	bad.solid=true
-	bad.move = function(self) end
-	bad.hit=
-		function(other)
-			if other == pl.boomerang then
-				bad.stun = 30
-			end
-
-			if other.good then
-				bad.alive = false
-			end
+	triggers["hut_start"].func =
+		function()
+			tbox("ivan", "hey! listen!")
+			tbox("ivan", "wake up lank.")
+			tbox("lank", "...")
+			tbox("ivan", "lank, princess zeldo is being held captive by canondwarf! you gotta rescue her!")
+			tbox("lank", "who are you?")
+			tbox("ivan", "i'm your fairy")
+			tbox("lank", "oh, okay.")
+			triggers["hut_start"].active=false
 		end
 
-	bad.destroy =
-		function(self)
-			local col = nil
-			-- smaller chance you get a heart.
-			if dice_roll(5) then
-				col = gen_heart(bad.x, bad.y)
-			else
-				col = gen_power_orb(bad.x, bad.y)
-			end
+	triggers["steal"].func =
+		function()
+			tbox("ivan", "look! it's a chest.  try pressing z near it.")
+			tbox("lank", "but it's not mine..")
+			tbox("ivan", "nevermind that. you're just borrowing it.")
+			tbox("lank", "well, i guess i could give it back later.")
 			
-			col.dx = bad.dx*3
-			col.dy = bad.dy*3
+			triggers["steal"].active=false
 		end
 
-	-- enemy faces player, assumes sprite is facing left
-	bad.draw =
-		function(a)
-			draw_actor(a, nil, nil, a.x < pl.x, nil)
-		end
-
-	return bad
-end
-
-function gen_dark_link(x, y)
-	local bad = gen_enemy(x, y)
-	bad.spr = 124
-	return bad
-end
-
-function gen_octorok(x, y)
-	local bad = gen_enemy(x, y)
-	bad.spr = 86
-	return bad
-end
-
-function gen_poe(x, y)
-	local bad = gen_enemy(x, y)
-	bad.spr = 116
-	bad.solid = false
-	bad.touchable = false
-	bad.move = function(self) move_counter(self, 4, 5, 5, self.t) end
-	bad.draw =
-		function(a)
-			draw_actor(a, nil, nil, a.dx > 0, nil)
-		end
-	return bad
-end
-
-function gen_bullet(x,y,dx,dy)
-	local bad = gen_enemy(x,y)
-	if dx == nil then dx = 0 end
-	if dy == nil then dy = 0 end
-	bad.dx = dx
-	bad.dy = dy
-	bad.inertia=1
-	bad.solid=false
-	bad.touchable=false
-	bad.destroy=function(self) end
-	-- die if the bullet is out of bounds.
-	bad.outside=
-		function(a)
-			a.alive = false
-		end
-
-	-- rotate the bullet
-	bad.draw=
-		function(a)
-			if a.t % 40 < 10 then
-				draw_actor(a, nil, nil, false, false)
-			elseif a.t % 30 < 10 then
-				draw_actor(a, nil, nil, false, true)
-			elseif a.t % 20 < 10 then
-				draw_actor(a, nil, nil, true, true)
-			elseif a.t % 10 < 10 then
-				draw_actor(a, nil, nil, true, false)
-			end
-		end
-
-	return bad
-end
-
-function gen_deku_bullet(x,y,dx,dy)
-	local bad = gen_bullet(x,y,dx,dy)
-	bad.spr = 71
-	return bad
-end
-
-function gen_energy_ball(x,y,dx,dy)
-	local ball = gen_bullet(x,y,dx,dy)
-	ball.spr = 119
-	ball.bad = true
-	ball.deflect = false
-	ball.id = "ball"
-
-	ball.hit=
-		function(other)
-			if other == pl.sword and pl.has_master and ball.good == false then
-				ball.deflect = true
-				ball.good = true
-			end
-		end
-
-	ball.move=function(self)
-		if ball.deflect then 
-			ball.deflect = false
-			ball.dx *= -1
-			ball.dy *= -1
-		end
-	end
-
-	return ball
-end
-
-function gen_deku(x, y)
-	local bad = gen_enemy(x, y)
-	bad.spr = 70
-
-	-- deku shoots every so often.
-	bad.move =
-		function(a)
-			if a.t % 60 == 0 then
-				local dx = -.4
-				if a.x < pl.x then
-					dx = .4
-				end
-				gen_deku_bullet(a.x,a.y,dx,0)
-			end
-		end
-
-	return bad
-end
-
-function gen_skelly(x, y)
-	local bad = gen_enemy(x, y)
-	bad.spr = 68
-	bad.move = function(self) move_to_player(self, .1) end
-	bad.inertia = 0
-	return bad
-end
-
-function gen_canondwarf(x, y)
-	local bad = gen_enemy(x, y)
-	bad.solid = false
-
-	bad.reset =
+	triggers["no_sword"].func =
 		function()
-			bad.timer = 0
-			bad.state = 0
-			bad.spr = 109
-			bad.dx = 0
-			bad.dy = 0
-			bad.x = x
-			bad.y = y
-			bad.hearts = 6
-			bad.vulnerable = false
-			bad.clock = true
+			tbox("ivan", "hey, listen! you don't have a sword yet! how can you save zeldo like this?")
+			triggers["no_sword"].active=false
 		end
+end
 
-	bad.unload =
-		function()
-			clean_enemies()
-			add(actors, bad)
-			canon.reset()
-			if triggers["canon_intro"].active == false then
-				triggers["canon_resume"].active = true
-			end
+-- sets up the game and player, but not the various objects that are scene
+-- specific.
+function init_game()
+	actors = {}
+	pl = gen_link(8, 8)
+	gen_grass()
+end
+
+-- gets called whenever the scene switches.
+function scene_init(prev_marker)
+	local x = 0
+	local y = 0
+
+	if marker == "boss" then
+	elseif marker == "overworld" then
+		music(-1)
+		music(14)
+	elseif marker == "hut" then
+		music(-1)
+		music(63)
+		if prev_marker == "title" then
+			pl.visible = true
+			pl.x = 98.5
+			pl.y = 34
 		end
+	elseif marker == "old" then
+		music(-1)
+		music(63)
+	elseif marker == "sacred" then
+		music(-1)
+		music(45)
+		-- just a filler song
+	elseif marker == "title" then
+		music(-1)
+		music(0)
+		pl.visible = false
 
-	bad.reset()
-	bad.tres_text = "trespasser."
-
-	bad.move = function(self)
-		if self.state == 1 then -- start music
-			music(55)
-			self.state = 2
-			self.timer = 30
-		elseif self.state == 2 then -- move up at start
-			self.dy = -.05
-			self.timer -= 1
-			if self.timer <= 0 then
-				self.state = 3
-				self.timer = 60
-			end
-		elseif self.state == 3 then -- shoot player
-			self.timer -= 1
-			if self.timer <= 0 then
-				self.state = 4
-				self.timer = 120
-			elseif self.timer % 30 == 0 then
-				local ball = gen_energy_ball(self.x,self.y, 0, 0)
-				move_to_player(ball, .3)
-			end
-		elseif self.state == 4 then -- move to player
-			move_to_player(self, .05)
-			self.timer -= 1
-			if self.timer <= 0 then
-				self.state = 3
-				self.timer = 120
-			end
-		elseif self.state == 5 then -- got hit, gen things
-			gen_poe(self.x, self.y)
-			gen_skelly(98.5, 17.5)
-			gen_skelly(109.5, 17.5)
-			gen_skelly(109.5, 2.5)
-			gen_skelly(98.5, 2.5)
-			self.state = 6
-			self.vulnerable = true
-			self.timer = 60
-		elseif self.state == 6 then -- stunned then move to player.
-			self.timer -= 1
-			if self.timer <= 0 then
-				self.vulnerable = false
-				self.state = 4
-				self.timer = 120
-			elseif self.vulnerable == false then -- canon was hit
-				shake()
-			end
-		elseif self.state == 7 then -- second stage
-			shake()
-			local mid_x = 104
-			local mid_y = 8
-			move_to_point(self, .05, 104, 10)
-
-			-- if reached the center then
-			if self.x < mid_x + 2 and self.x > mid_x - 2 and self.y < mid_y + 2 and self.y > mid_y - 2 then
-				self.timer = 0
-				self.state = 8
-				self.touchable = false
-			end
-		elseif self.state == 8 then
-			if self.clock then
-				move_clockwise(self, 3, 2, 2, self.timer)
-			else
-				move_counter(self, 3, 2, 2, self.timer)
-			end
-
-			if self.timer % 60 == 0 then
-				local ball = gen_energy_ball(self.x,self.y, 0, 0)
-				move_to_player(ball, .3)
-			end
-
-			if self.timer % 360 == 0 then
-				gen_skelly(98.5, 17.5)
-				gen_skelly(109.5, 17.5)
-				gen_skelly(109.5, 2.5)
-				gen_skelly(98.5, 2.5)
-			end
-
-			self.timer += 1
-		elseif self.state == 9 then
-			self.vulnerable = true
-			self.state = 10
-			self.timer = 60
-			gen_skelly(self.x, self.y)
-		elseif self.state == 10 then
-			shake()
-			self.clock = not self.clock
-
-			if self.timer <= 0 then
-				self.vulnerable = false
-				self.state = 7
-			elseif self.vulnerable == false then -- canon was hit
-				shake()
-			end
-
-			self.timer -= 1
-		end
+	elseif marker == "shop" then
+		music(-1)
+		music(63)
 	end
 
-	bad.hit =
-		function(other)
-			if other.id == "ball" and other.good then
-				other.alive = false
-				if bad.state < 7 then
-					bad.state = 5
-				else
-					bad.state = 9
-					bad.timer = 60
-					gen_skelly(bad.x, bad.y)
-				end
-			elseif other == pl.sword and pl.has_master then
-				if bad.vulnerable then
-					bad.hearts -= 1
-					bad.vulnerable = false
-					if bad.hearts == 3 then
-						bad.state = 7
-					end
-				end
-			end
-
-			if bad.hearts <= 0 then
-				bad.alive = false
-			end
-		end
-
-	return bad
+	load_scene(marker)
 end
 
--- draws the hearts, but from the right.
-function draw_hearts(x, y)
-	-- hearts on right of screen
-	for i=0, pl.hearts-1, 1 do
-		draw_to_screen(35, x-8*(i+1), y-1)
-	end
-end
-
------------------
--- movement functions
------------------
-function move_clockwise(a, spd, radx, rady, timer)
-	local ang = -timer / 30 / spd
-	a.dx = radx * spd * cos(ang) / 30
-	a.dy = rady * spd * sin(ang) / 30
-end
-
--- assumes that when timer is zero, you are at the top of the circle.
-function move_counter(a, spd, radx, rady, timer)
-	local ang = timer / 30 / spd + .5
-	a.dx = radx * cos(ang) / 30
-	a.dy = rady * sin(ang) / 30
-end
-
-function move_vertical(a)
-	local slow = 4*30
-	a.dy = a.rady * sin(a.t / slow) / 30
-end
-
-function move_horizontal(a)
-	local slow = 4*30
-	a.dx = a.radx * cos(a.t / slow) / 30
-end
-
-function move_to_point(a, spd, x, y)
-	local ang = atan2(x - a.x, y - a.y)
-	a.dx = spd * cos(ang)
-	a.dy = spd * sin(ang)
-end
-
-function move_to_player(a, spd)
-	move_to_point(a, spd, pl.x, pl.y)
-end
-
-function move_from_player(a)
-	local slow = 2
-	local ang = atan2(a.x - pl.x, a.y - pl.y)
-	a.dx = a.radx * cos(ang) / 30 / slow
-	a.dy = a.rady * sin(ang) / 30 / slow
-end
-
--- fades the game to black then prints game over.
-game_over_timer = 5
-game_over_fadein = 3
-function draw_game_over()
-
-	local yoff = sin(time() / 8)
-	local fade_ind=58
-	if game_over_timer > 0 then
-		if time() % 1 == 0 then
-			game_over_timer -= 1
-		end
-	elseif game_over_timer == 0 and game_over_fadein > 0 then
-		if time() % 1 == 0 then
-			game_over_fadein -= 1
-		end
+function scene_draw()
+	if marker == "title" then
+		draw_title()
+		return
 	end
 
-	for i=0,120,8 do
-		for j=0,120,8 do
-			draw_to_screen(fade_ind+game_over_timer, i, j)
-		end
+	if marker == "hut" then
+		draw_map(96, 32, 5, 5)
+	elseif marker == "boss" then
+		draw_map(offw, 0, 32, 32)
+	elseif marker == "overworld" then
+		draw_map(0, 0, offw, offh)
+		draw_wrap(0, 0, offw, offh)
+	elseif marker == "old" then
+		draw_map(96, 38, 5, 5)
+	elseif marker == "sacred" then
+		draw_map (113, 33, 10, 22)
+		draw_wrap(113, 33, 10, 22)
+	elseif marker == "shop" then
+		draw_map(101, 33, 11, 10)
+	else -- assume lost woods
+		draw_map (97, 45, 10, 10)
+		draw_wrap(97, 45, 10, 10, 1)
 	end
 
-	if game_over_fadein <= 2 then
-		print("game over", 46, 47+yoff, 7 - game_over_fadein)
-		print("reset cart to play again", 16, 77+yoff, 7 - game_over_fadein)
+	draw_things()
+	draw_hearts(126, 2)
+	draw_items(2, 118)
+	draw_power_orbs(2, 2)
+
+	if pl.alive == false then
+		draw_game_over()
+		draw_link_death()
 	end
 
+	if not ivan_revealed then
+		draw_fairy()
+	end
+
+	tbox_draw()
 end
-
 ------------------------------------------------------------------------------
 -- text box implementation, taken from https://github.com/jessemillar/pico-8
 -- fixed bugs for this game though.
 ------------------------------------------------------------------------------
+
+tbox_messages={} -- the array for keeping track of text box overflows
+
 -- turns a long word into a list of words with each one ending in a dash except
 -- the last one. this function assumes the parameter is a word (no spaces).
 function break_up_long_word(word_list, word, max_len)
@@ -2207,8 +2281,18 @@ function words_to_lines(words, line_len)
 	return line_list
 end
 
--- add a new text box
-function tbox(speaker, message)
+function is_tbox_done(id)
+	for l in all(tbox_messages) do
+		if l.id == id then
+			return false
+		end
+	end
+	return true
+end
+
+-- add a new text box, id is optional, it is the id of the event. You can check
+-- if an event is done with a unique id.
+function tbox(speaker, message, id)
 	local line_len=26
 
 	-- if there are an odd number of lines.
@@ -2220,13 +2304,13 @@ function tbox(speaker, message)
 	local lines = words_to_lines(words, line_len)
 
 	for l in all(lines) do
-		tbox_line(speaker, l)
+		tbox_line(speaker, l, id)
 	end
 end
 
 -- a utility function for easily adding a line to the messages array
-function tbox_line(speaker, l)
-	local line={speaker=speaker, line=l, animation=0}
+function tbox_line(speaker, l, id)
+	local line={speaker=speaker, line=l, animation=0, id=id}
 	add(tbox_messages, line)
 end
 
@@ -2235,6 +2319,7 @@ function tbox_interact()
 	if btnp(4) and #tbox_messages>0 then
 		-- sfx(30) -- play a sound effect
 
+		-- does the animation complete
 		if #tbox_messages>1 then
 			del(tbox_messages, tbox_messages[1])
 		end
@@ -2299,19 +2384,6 @@ function tbox_draw()
 		palt(0,false)
 	end
 end
-
-------------------------------------------------------------------------------
--- screen shake implementation, taken from https://github.com/jessemillar/pico-8
--- slightly modified
-------------------------------------------------------------------------------
-function shake(reset) -- shake the screen
-	camera(0,0) -- reset to 0,0 before each shake so we don't drift
-
-	if not reset then -- if the param is true, don't shake, just reset the screen to default
-		camera(flr(rnd(2)-1),flr(rnd(2)-1)) -- define shake power here (-1 to shake equally in all directions)
-	end
-end
-
 __gfx__
 00000000330000333333333333333333555555555d55555555555555400004445445455444444444000000000221022102110211444422222222444422442422
 000000003053350333b3bb333333333355666655d555555d55555555006660044454445444444444052222500022000202220222444444444444444422442422

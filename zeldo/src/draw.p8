@@ -183,3 +183,133 @@ function draw_hearts(x, y)
 		draw_to_screen(35, x-8*(i+1), y-1)
 	end
 end
+
+function scene_draw()
+	-- the marker variable is for the transitions.
+	local mark = ""
+	if trans_after_peak then
+		mark = marker
+	else
+		mark = prev_marker
+	end
+
+	if mark == "title" then
+		draw_title()
+		return
+	end
+
+	if mark == "hut" then
+		draw_map(96, 32, 5, 5)
+	elseif mark == "boss" then
+		draw_map(offw, 0, 32, 32)
+	elseif mark == "overworld" then
+		draw_map(0, 0, offw, offh)
+		draw_wrap(0, 0, offw, offh)
+	elseif mark == "old" then
+		draw_map(96, 38, 5, 5)
+	elseif mark == "sacred" then
+		draw_map (113, 33, 10, 22)
+		draw_wrap(113, 33, 10, 22)
+	elseif mark == "shop" then
+		draw_map(101, 33, 11, 10)
+	else -- assume lost woods
+		draw_map (97, 45, 10, 10)
+		draw_wrap(97, 45, 10, 10, 1)
+	end
+
+	draw_things()
+	draw_hearts(126, 2)
+	draw_items(2, 118)
+	draw_power_orbs(2, 2)
+
+	if pl.alive == false then
+		draw_game_over()
+		draw_link_death()
+	end
+
+	if not ivan_revealed then
+		draw_fairy()
+	end
+
+	tbox_draw()
+end
+
+function _draw()
+	if not trans_active or trans_after_peak then
+		scene_draw()
+		draw_triggers() -- debugging
+		print(marker, 50, 2, 7)
+	end
+
+	
+	local prev_trans_active = trans_active
+	trans_after_peak = transition_draw(30, screen_swipe)
+
+	if prev_trans_active != trans_active then
+		music(trans_song)
+	end
+
+	sleep = trans_active
+end
+
+function draw_map(x, y, w, h)
+	cls(0)
+	local offx = -pl.x*8+64
+	local offy = -pl.y*8+64
+	map(x, y, x * 8 + offx, y * 8 + offy, w, h)
+end
+
+trans_active = false
+trans_after_peak = false
+trans_timer = 0
+trans_song = -1
+
+-- call to start a transition.
+function transition(mark, music_when_done, sound_effect)
+	if not trans_active then
+		marker = mark
+		trans_active = true
+		trans_timer = 0
+		trans_after_peak = false
+		sleep = true
+		if music_when_done == nil then
+			trans_song = -1
+		else
+			trans_song = music_when_done
+		end
+
+		music(-1)
+		if sound_effect == nil then
+			sfx(-1)
+		else
+			sfx(sound_effect)
+		end
+	end
+end
+
+-- returns true if it is at least halfway done.
+function transition_draw(time, func)
+	local after_peak = false
+	if trans_active then
+		after_peak = func(time, trans_timer)
+		trans_timer += 1
+		if trans_timer >= time then
+			trans_active = false
+		end
+	end
+	return after_peak
+end
+
+-- a transition effect. returns true if it is at least halfway done.
+function screen_swipe(length, timer)
+	-- only want to go in a half circle.
+	local pos = 128 * sin(timer / length / 2 + .5)
+
+	if timer > length / 2 then
+		rectfill(128-pos,0,129,128,0)
+	else
+		rectfill(-1,0,pos,128,0)
+	end
+
+	return timer >= flr(length / 2)
+end

@@ -2,7 +2,10 @@ scene_actors = {}
 draw_map_funcs = {}
 triggers = {}
 marker = "title"  -- where you are in the story, start on title screen.
+prev_marker = marker
 global_time=0 -- the global timer of the game, used by text box functions
+
+sleep = false -- used to sleep the update function
 
 actors = {} -- all actors in world.
 offh = 64
@@ -28,32 +31,23 @@ function _init()
 end
 
 function _update()
-	local prev_marker = marker
+	-- only update if we are not in the middle of a marker change.
+	if prev_marker == marker and not sleep then
+		prev_marker = marker
 
-	if marker == "title" then
-		title_update()
-	else
-		scene_update()
-	end
+		if marker == "title" then
+			title_update()
+		else
+			scene_update()
+		end
 
-	if prev_marker != marker then
-		scene_init(prev_marker)
+		if prev_marker != marker then
+			scene_init()
+			prev_marker = marker
+		end
 	end
 
 	global_time=global_time+1 -- increment the clock
-end
-
-function _draw()
-	scene_draw()
-	draw_triggers() -- debugging
-	print(marker, 50, 2, 7)
-end
-
-function draw_map(x, y, w, h)
-	cls(0)
-	local offx = -pl.x*8+64
-	local offy = -pl.y*8+64
-	map(x, y, x * 8 + offx, y * 8 + offy, w, h)
 end
 
 function is_pl_in_box(box)
@@ -398,7 +392,7 @@ end
 
 function title_update()
 	if btnp(4) then
-		marker = "hut"
+		transition("hut", 63, 63)
 	end
 end
 

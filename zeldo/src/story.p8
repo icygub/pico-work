@@ -66,7 +66,7 @@ function init_game()
 end
 
 -- gets called whenever the scene switches.
-function scene_init(prev_marker)
+function scene_init()
 	local x = 0
 	local y = 0
 
@@ -75,8 +75,8 @@ function scene_init(prev_marker)
 		music(-1)
 		music(14)
 	elseif marker == "hut" then
-		music(-1)
-		music(63)
+		--music(-1)
+		--music(63)
 		if prev_marker == "title" then
 			pl.visible = true
 			pl.x = 98.5
@@ -102,44 +102,3 @@ function scene_init(prev_marker)
 	load_scene(marker)
 end
 
-function scene_draw()
-	if marker == "title" then
-		draw_title()
-		return
-	end
-
-	if marker == "hut" then
-		draw_map(96, 32, 5, 5)
-	elseif marker == "boss" then
-		draw_map(offw, 0, 32, 32)
-	elseif marker == "overworld" then
-		draw_map(0, 0, offw, offh)
-		draw_wrap(0, 0, offw, offh)
-	elseif marker == "old" then
-		draw_map(96, 38, 5, 5)
-	elseif marker == "sacred" then
-		draw_map (113, 33, 10, 22)
-		draw_wrap(113, 33, 10, 22)
-	elseif marker == "shop" then
-		draw_map(101, 33, 11, 10)
-	else -- assume lost woods
-		draw_map (97, 45, 10, 10)
-		draw_wrap(97, 45, 10, 10, 1)
-	end
-
-	draw_things()
-	draw_hearts(126, 2)
-	draw_items(2, 118)
-	draw_power_orbs(2, 2)
-
-	if pl.alive == false then
-		draw_game_over()
-		draw_link_death()
-	end
-
-	if not ivan_revealed then
-		draw_fairy()
-	end
-
-	tbox_draw()
-end

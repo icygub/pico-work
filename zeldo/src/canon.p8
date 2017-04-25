@@ -1,48 +1,22 @@
-function gen_energy_ball(x,y,dx,dy)
-	local ball = gen_bullet(x,y,dx,dy)
-	ball.spr = 119
-	ball.bad = true
-	ball.deflect = false
-	ball.id = "ball"
-
-	ball.hit=
-		function(other)
-			if other == pl.sword and pl.has_master and ball.good == false then
-				ball.deflect = true
-				ball.good = true
-			end
-		end
-
-	ball.move=function(self)
-		if ball.deflect then 
-			ball.deflect = false
-			ball.dx *= -1
-			ball.dy *= -1
-		end
-	end
-
-	return ball
-end
-
+--- NEW CANONDWARF!!!!!!!!
 function gen_canondwarf(x, y)
-	local bad = gen_enemy(x, y)
-	bad.solid = false
-	bad.killed = false
+	local bad = gen_boss(x, y)
+	add_canon_stages(bad)
+
+	bad.defeated =
+	function()
+		canon_kill(bad)
+	end
 
 	bad.reset =
 		function()
 			bad.spr = 109
 			bad.dx = 0
 			bad.dy = 0
-			if not bad.killed then
-				bad.x = x
-				bad.y = y
-				bad.hearts = 1
-				bad.state = 0
-				bad.timer = 0
-			end
-			bad.vulnerable = false
-			bad.clock = true
+			bad.x = x
+			bad.y = y
+			bad.solid = false
+			bad.touchable = true
 		end
 
 	bad.unload =
@@ -69,150 +43,213 @@ function gen_canondwarf(x, y)
 			end
 		end
 
-	bad.reset()
 	bad.tres_text = "trespasser."
-
-	bad.move = canon_move
-
-	bad.hit =
-		function(other)
-			if other.id == "ball" and other.good then
-				other.alive = false
-				if bad.state < 7 then
-					bad.state = 5
-				else
-					bad.state = 9
-					bad.timer = 60
-					gen_skelly(bad.x, bad.y)
-				end
-			elseif other == pl.sword and pl.has_master then
-				if bad.vulnerable then
-					bad.hearts -= 1
-					bad.vulnerable = false
-					if bad.hearts == 3 then
-						bad.state = 7
-					end
-				end
-			end
-
-			if bad.hearts <= 0 and bad.state < 11 then
-				sfx(22)
-				music(-1)
-				bad.state = 11
-				bad.timer = 90 -- how long to shake when dead.
-			end
-		end
+	bad.reset()
 
 	return bad
 end
 
-function canon_move(self)
-	if self.state == 1 then -- start music
-		music(55)
-		self.state = 2
-		self.timer = 30
-	elseif self.state == 2 then -- move up at start
-		self.dy = -.05
-		self.timer -= 1
-		if self.timer <= 0 then
-			self.state = 3
-			self.timer = 60
+-- give this canondwarf and stages will be added.
+function add_canon_stages(bad)
+	add(bad.stages, make_canon_stage1())
+	add(bad.stages, make_canon_stage2())
+	add(bad.stages, make_canon_stage3())
+end
+
+function make_canon_stage1()
+	local stage = make_stage()
+	stage.lives = 3
+	stage.hit_func =
+	function(self, other, stage, state)
+		if other.id == "ball" and other.good then
+			other.alive = false
+			stage.move_to_state("stunned")
 		end
-	elseif self.state == 3 then -- shoot player
-		self.timer -= 1
-		if self.timer <= 0 then
-			self.state = 4
-			self.timer = 120
-		elseif self.timer % 30 == 0 then
-			local ball = gen_energy_ball(self.x,self.y, 0, 0)
-			move_to_player(ball, .3)
+	end
+
+	stage.hurt_func =
+	function(self, other, stage, state)
+		if other == pl.sword and pl.has_master then
+			stage.lives -= 1
+			stage.vulnerable = false
 		end
-	elseif self.state == 4 then -- move to player
-		move_to_player(self, .05)
-		self.timer -= 1
-		if self.timer <= 0 then
-			self.state = 3
-			self.timer = 120
+	end
+
+	stage.states["topl"] = make_state(
+	function(actor, stage, timer)
+		move_to_player(actor, .05)
+		if timer > 120 then
+			stage.move_to_state("shootpl")
 		end
-	elseif self.state == 5 then -- got hit, gen things
-		gen_poe(self.x, self.y)
-		gen_skelly(98.5, 17.5)
-		gen_skelly(109.5, 17.5)
-		gen_skelly(109.5, 2.5)
-		gen_skelly(98.5, 2.5)
-		self.state = 6
-		self.vulnerable = true
-		self.timer = 60
-	elseif self.state == 6 then -- stunned then move to player.
-		self.timer -= 1
-		if self.timer <= 0 then
-			self.vulnerable = false
-			self.state = 4
-			self.timer = 120
-		elseif self.vulnerable == false then -- canon was hit
-			shake()
+	end)
+
+	stage.states["shootpl"] = make_state(
+	function(actor, stage, timer)
+		if timer >= 120 then
+			stage.move_to_state("topl")
+		elseif timer % 30 == 0 then
+			shoot_ball_to_pl(actor)
 		end
-	elseif self.state == 7 then -- second stage
+	end)
+
+	stage.states["begin"] = make_state(
+	function(actor, stage, timer)
+		if timer == 0 then
+			music(55) -- play actual canon music!
+		elseif timer >= 30 then
+			stage.move_to_state("shootpl")
+		else
+			actor.dy = -.05
+		end
+	end)
+
+	stage.states["stunned"] = make_state(
+	function(actor, stage, timer)
+		if timer == 0 then
+			gen_poe(self.x, self.y)
+			gen_skellies_in_corners()
+			stage.vulnerable = true
+		elseif timer >= 60 then
+			self.move_to_state("topl")
+		else
+			-- canon was hit
+			if not stage.vulnerable then
+				shake()
+			end
+		end
+	end)
+
+	return stage
+end
+
+function make_canon_stage2()
+	local stage = make_stage()
+	stage.lives = 3
+	stage.hit_func =
+	function(self, other, stage, state)
+		if other.id == "ball" and other.good then
+			other.alive = false
+			stage.move_to_state("stunned")
+		end
+	end
+
+	stage.hurt_func =
+	function(self, other, stage, state)
+		if other == pl.sword and pl.has_master then
+			stage.lives -= 1
+			stage.vulnerable = false
+		end
+	end
+
+	stage.states["begin"] = make_state(
+	function(actor, stage, timer)
+		if timer == 0 then
+			-- go through cannon for second stage.
+			actor.touchable = false
+		elseif timer >= 30 then
+			stage.move_to_state("shootpl")
+		else
+			actor.dy = -.05
+		end
+	end)
+
+	-- slightly different from other stage's stun.
+	stage.states["stunned"] = make_state(
+	function(actor, stage, timer)
+		if timer == 0 then
+			gen_skelly(self.x, self.y)
+			stage.vulnerable = true
+		elseif timer >= 60 then
+			self.move_to_state("tocenter")
+		else
+			-- canon was hit.
+			if not stage.vulnerable then
+				shake()
+			end
+		end
+	end)
+
+	stage.states["tocenter"] = make_state(
+	function(actor, stage, timer)
 		shake()
 		local mid_x = 104
 		local mid_y = 8
-		move_to_point(self, .05, 104, 10)
-		-- if reached the center then
-		if self.x < mid_x + 2 and self.x > mid_x - 2 and self.y < mid_y + 2 and self.y > mid_y - 2 then
-			self.timer = 0
-			self.state = 8
-			self.touchable = false
+		move_to_point(actor, .05, 104, 10)
+
+		-- if reached the center
+		if actor.x < mid_x + 2 and actor.x > mid_x - 2 and actor.y < mid_y + 2 and actor.y > mid_y - 2 then
+			stage.move_to_state("circle")
 		end
-	elseif self.state == 8 then
-		if self.clock then
-			move_clockwise(self, 3, 2, 2, self.timer)
+	end)
+
+	stage.states["circle"] = make_state(
+	function(actor, stage, timer)
+		if timer == 0 then
+			-- either move clockwise or counter.
+			stage.clock = dice_roll(2)
 		else
-			move_counter(self, 3, 2, 2, self.timer)
+			if stage.clock then
+				move_clockwise(actor, 3, 2, 2, timer)
+			else
+				move_counter(actor, 3, 2, 2, timer)
+			end
+
+			if timer % 60 == 0 then
+				shoot_ball_to_pl(actor)
+			end
+
+			if timer % 360 == 0 then
+				gen_skellies_in_corners()
+			end
 		end
-		if self.timer % 60 == 0 then
-			local ball = gen_energy_ball(self.x,self.y, 0, 0)
-			move_to_player(ball, .3)
-		end
-		if self.timer % 360 == 0 then
-			gen_skelly(98.5, 17.5)
-			gen_skelly(109.5, 17.5)
-			gen_skelly(109.5, 2.5)
-			gen_skelly(98.5, 2.5)
-		end
-		self.timer += 1
-	elseif self.state == 9 then
-		self.vulnerable = true
-		self.state = 10
-		self.timer = 60
-		gen_skelly(self.x, self.y)
-	elseif self.state == 10 then
-		shake()
-		self.clock = not self.clock
-		if self.timer <= 0 then
-			self.vulnerable = false
-			self.state = 7
-		elseif self.vulnerable == false then -- canon was hit
-			shake()
-		end
-		self.timer -= 1
-	elseif self.state == 11 then -- defeated, shaking like crazy.
-		shake()
-		self.timer -= 1
-		if self.timer <= 0 then
-			canon_kill(self)
-		end
-	end
+	end)
+
+	return stage
 end
 
+-- this is the stage that he is defeated.
+function make_canon_stage3()
+	local stage = make_stage()
+	stage.lives = 1
+	-- no hit nor hurt functions.
+
+	stage.states["begin"] = make_state(
+	function(actor, stage, timer)
+		shake()
+		if timer == 0 then
+			music(-1)
+			sfx(22)
+		elseif timer > 90 then
+			stage.lives = 0
+		end
+	end)
+
+	return stage
+end
+
+-- a utility function that generates four skeletons in the boss room.
+function gen_skellies_in_corners()
+	gen_skelly(98.5, 17.5)
+	gen_skelly(109.5, 17.5)
+	gen_skelly(109.5, 2.5)
+	gen_skelly(98.5, 2.5)
+end
+
+-- utility function. parameter is the actor to shoot from.
+function shoot_ball_to_pl(actor)
+	local ball = gen_energy_ball(actor.x,actor.y, 0, 0)
+	move_to_player(ball, .3)
+end
+
+
+--- TEMPORARY THINGS THAT determine canon being killed.
 function canon_kill(bad)
-	bad.state = 12
 	music(-1)
 
-	bad.killed = true
 	bad.bad = false
 	bad.static = true
 
-	-- canon is killed now, no need to re-add him after enemies are cleaned.
+	-- canon isn't bad now, no need to re-add him after enemies are cleaned.
 	clean_enemies()
 
 	bad.move=actor_interact
@@ -221,15 +258,20 @@ function canon_kill(bad)
 			tbox("canondwarf", "yer such a meanie!!!")
 		end
 
-	-- make zelda
+	-- get rid of the cage.
 	mset(101, 2, 98)
 	mset(102, 2, 99)
+
+	-- set locations
 	bad.x = 104
 	bad.y = 3.5
 	pl.x = 103
 	pl.y = 4.5
 
+	-- make zelda
 	gen_zeldo(102, 3.5)
+
+	-- make it look like they didn't just teleport. heh.
 	transition(marker)
 
 	ivan_reveal_cutscene()

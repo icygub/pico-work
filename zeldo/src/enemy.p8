@@ -1,4 +1,3 @@
-
 function gen_deku(x, y)
 	local bad = gen_enemy(x, y)
 	bad.spr = 70
@@ -42,12 +41,6 @@ function gen_poe(x, y)
 		function(a)
 			draw_actor(a, nil, nil, a.dx > 0, nil)
 		end
-	return bad
-end
-
-function gen_dark_link(x, y)
-	local bad = gen_enemy(x, y)
-	bad.spr = 124
 	return bad
 end
 
@@ -101,7 +94,6 @@ function gen_enemy(x, y)
 	return bad
 end
 
-
 function gen_bullet(x,y,dx,dy)
 	local bad = gen_enemy(x,y)
 	if dx == nil then dx = 0 end
@@ -111,6 +103,7 @@ function gen_bullet(x,y,dx,dy)
 	bad.inertia=1
 	bad.solid=false
 	bad.touchable=false
+	bad.deflect = false
 	bad.destroy=function(self) end
 	-- die if the bullet is out of bounds.
 	bad.outside=
@@ -132,5 +125,31 @@ function gen_bullet(x,y,dx,dy)
 			end
 		end
 
+	-- for reflecting the bullet
+	bad.hit=
+		function(other)
+			if other == pl.sword and pl.has_master and bad.good == false then
+				bad.deflect = true
+				bad.good = true
+			elseif other.bad and bad.good and other.touchable then
+				bad.alive = false
+			end
+		end
+
+	bad.move=function(self)
+		if bad.deflect then 
+			bad.deflect = false
+			bad.dx *= -1
+			bad.dy *= -1
+		end
+	end
+
 	return bad
+end
+
+function gen_energy_ball(x,y,dx,dy)
+	local ball = gen_bullet(x,y,dx,dy)
+	ball.spr = 119
+	ball.id = "ball"
+	return ball
 end

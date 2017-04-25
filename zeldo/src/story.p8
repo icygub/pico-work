@@ -1,6 +1,3 @@
-
-ivan_revealed = false
-
 function make_triggers()
 	-- trigger positions
 	make_trigger("no_sword",     7,    10,    9,    12)
@@ -17,8 +14,6 @@ function make_triggers()
 	make_trigger("old_exit",    97,   43,    100,  44,   {x=16,   y=48.5}, "overworld", 14, -1)
 	make_trigger("shop_exit",   104,  43,    109,  44,   {x=29.5, y=56.5}, "overworld", 14, -1)
 	make_trigger("sacred_exit", 116,  55,    120,  56,   {x=32.5, y=1.5},  "overworld", 14, -1)
-
-	-- start out false
 
 	triggers["mast_intro"].func =
 		function()

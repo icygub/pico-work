@@ -8,7 +8,7 @@ function gen_zeldo(x, y)
 
 	girl.interact =
 		function()
-			tbox("zeldo", "you must find and defeat ivan.")
+			tbox("zeldo", "go home lank.")
 		end
 
 	return girl

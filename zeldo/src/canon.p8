@@ -10,12 +10,15 @@ function gen_canondwarf(x, y)
 		function()
 			bad.spr = 109
 			bad.dx = 0
+			bad.static = true
+			bad.touchable = true
 			bad.dy = 0
 			bad.x = x
 			bad.y = y
 			bad.solid = false
-			bad.touchable = true
-			add_canon_stages(bad)
+			add(bad.stages, make_canon_stage1())
+			add(bad.stages, make_canon_stage2())
+			add(bad.stages, make_canon_stage3())
 		end
 
 	bad.unload =
@@ -48,26 +51,13 @@ function gen_canondwarf(x, y)
 	return bad
 end
 
--- give this canondwarf and stages will be added.
-function add_canon_stages(bad)
-	add(bad.stages, make_canon_stage1())
-	add(bad.stages, make_canon_stage2())
-	add(bad.stages, make_canon_stage3())
-end
-
 function make_canon_stage1()
 	local stage = make_stage()
-	stage.lives = 1
-	stage.hit_func =
-	function(self, other, stage, state)
-		if other.id == "ball" and other.good then
-			other.alive = false
-			stage.move_to_state("stunned")
-		end
-	end
+	stage.lives = 3
+	stage.hit_func = canondwarf_hit
 
 	stage.hurt_func =
-	function(self, other, stage, state)
+	function(other, stage, state)
 		if other == pl.sword and pl.has_master then
 			stage.lives -= 1
 			stage.vulnerable = false
@@ -110,6 +100,7 @@ function make_canon_stage1()
 			stage.vulnerable = true
 		elseif timer >= 60 then
 			stage.move_to_state("topl")
+			stage.vulnerable = false
 		else
 			-- canon was hit
 			if not stage.vulnerable then
@@ -123,17 +114,11 @@ end
 
 function make_canon_stage2()
 	local stage = make_stage()
-	stage.lives = 1
-	stage.hit_func =
-	function(self, other, stage, state)
-		if other.id == "ball" and other.good then
-			other.alive = false
-			stage.move_to_state("stunned")
-		end
-	end
+	stage.lives = 3
+	stage.hit_func = canondwarf_hit
 
 	stage.hurt_func =
-	function(self, other, stage, state)
+	function(other, stage, state)
 		if other == pl.sword and pl.has_master then
 			stage.lives -= 1
 			stage.vulnerable = false
@@ -144,7 +129,7 @@ function make_canon_stage2()
 	function(actor, stage, timer)
 		if timer == 0 then
 			-- go through cannon for second stage.
-			actor.touchable = false
+			actor.touchable=false
 			stage.move_to_state("tocenter")
 		end
 	end)
@@ -153,10 +138,11 @@ function make_canon_stage2()
 	stage.states["stunned"] = make_state(
 	function(actor, stage, timer)
 		if timer == 0 then
-			gen_skelly(actor.x, actor.y)
+			gen_skellies_in_corners()
 			stage.vulnerable = true
 		elseif timer >= 60 then
 			stage.move_to_state("tocenter")
+			stage.vulnerable = false
 		else
 			-- canon was hit.
 			if not stage.vulnerable then
@@ -194,7 +180,7 @@ function make_canon_stage2()
 				shoot_ball_to_pl(actor)
 			end
 
-			if timer % 360 == 0 then
+			if timer % 180 == 0 then
 				gen_skellies_in_corners()
 			end
 		end
@@ -214,7 +200,7 @@ function make_canon_stage3()
 		shake()
 		if timer == 0 then
 			-- be able to touch our friend.
-			actor.touchable = true
+			actor.touchable=true
 			music(-1)
 			sfx(22)
 		elseif timer > 90 then
@@ -223,6 +209,13 @@ function make_canon_stage3()
 	end)
 
 	return stage
+end
+
+-- a utility function, canondwarf's hit function
+function canondwarf_hit(other, stage, state)
+	if other.id == "ball" and other.good then
+		stage.move_to_state("stunned")
+	end
 end
 
 -- a utility function that generates four skeletons in the boss room.
@@ -239,38 +232,11 @@ function shoot_ball_to_pl(actor)
 	move_to_player(ball, .3)
 end
 
-function gen_energy_ball(x,y,dx,dy)
-	local ball = gen_bullet(x,y,dx,dy)
-	ball.spr = 119
-	ball.bad = true
-	ball.deflect = false
-	ball.id = "ball"
-
-	ball.hit=
-		function(other)
-			if other == pl.sword and pl.has_master and ball.good == false then
-				ball.deflect = true
-				ball.good = true
-			end
-		end
-
-	ball.move=function(self)
-		if ball.deflect then 
-			ball.deflect = false
-			ball.dx *= -1
-			ball.dy *= -1
-		end
-	end
-
-	return ball
-end
-
 --- TEMPORARY THINGS THAT determine canon being killed.
 function canon_kill(bad)
 	music(-1)
 
 	bad.bad = false
-	bad.static = true
 
 	-- canon isn't bad now, no need to re-add him after enemies are cleaned.
 	clean_enemies()
@@ -297,14 +263,9 @@ function canon_kill(bad)
 	-- make it look like they didn't just teleport. heh.
 	transition(marker)
 
-	ivan_reveal_cutscene()
-end
-
-function ivan_reveal_cutscene()
-	ivan_revealed = true
 	tbox("canondwarf", "you beat me. that hurt.")
 	tbox("zeldo", "lank, why did you beat up canondwarf?")
 	tbox("zeldo", "we were just about to have a tea party.")
-	tbox("ivan", "haha. ha. ha.")
-	tbox("ivan", "mwahahahahaha.")
+	tbox("canondwarf", "yeah, and you just had to interrupt my tea party.")
+	tbox("zeldo", "go home lank. we don't need you.")
 end

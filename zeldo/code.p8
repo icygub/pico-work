@@ -369,14 +369,14 @@ function make_trigger(name, x1, y1, x2, y2, pos, mark, mus, snd)
 end
 
 -- used for debugging purposes.
-function draw_triggers()
-	for k,v in pairs(triggers) do
-		rect(v.box.x1*8 + offset_x(),
-			  v.box.y1*8 + offset_y(),
-			  v.box.x2*8 + offset_x(),
-			  v.box.y2*8 + offset_y(), 10)
-	end
-end
+--function draw_triggers()
+--	for k,v in pairs(triggers) do
+--		rect(v.box.x1*8 + offset_x(),
+--			  v.box.y1*8 + offset_y(),
+--			  v.box.x2*8 + offset_x(),
+--			  v.box.y2*8 + offset_y(), 10)
+--	end
+--end
 
 function trigger_update()
 	for k, v in pairs(triggers) do
@@ -553,9 +553,9 @@ function gen_boss(x, y)
 		local state = stage.states[stage.cur_state]
 
 		if stage.vulnerable then
-			stage.hurt_func(bad, other, stage, state)
+			stage.hurt_func(other, stage, state)
 		else
-			stage.hit_func(bad, other, stage, state)
+			stage.hit_func(other, stage, state)
 		end
 	end
 
@@ -579,7 +579,6 @@ function gen_boss(x, y)
 					bad.killed = true
 					bad.move = function() end
 					bad.hit  = function() end
-					printh("kelled heem")
 
 					bad.defeated()
 				end
@@ -636,12 +635,15 @@ function gen_canondwarf(x, y)
 		function()
 			bad.spr = 109
 			bad.dx = 0
+			bad.static = true
+			bad.touchable = true
 			bad.dy = 0
 			bad.x = x
 			bad.y = y
 			bad.solid = false
-			bad.touchable = true
-			add_canon_stages(bad)
+			add(bad.stages, make_canon_stage1())
+			add(bad.stages, make_canon_stage2())
+			add(bad.stages, make_canon_stage3())
 		end
 
 	bad.unload =
@@ -674,26 +676,13 @@ function gen_canondwarf(x, y)
 	return bad
 end
 
--- give this canondwarf and stages will be added.
-function add_canon_stages(bad)
-	add(bad.stages, make_canon_stage1())
-	add(bad.stages, make_canon_stage2())
-	add(bad.stages, make_canon_stage3())
-end
-
 function make_canon_stage1()
 	local stage = make_stage()
-	stage.lives = 1
-	stage.hit_func =
-	function(self, other, stage, state)
-		if other.id == "ball" and other.good then
-			other.alive = false
-			stage.move_to_state("stunned")
-		end
-	end
+	stage.lives = 3
+	stage.hit_func = canondwarf_hit
 
 	stage.hurt_func =
-	function(self, other, stage, state)
+	function(other, stage, state)
 		if other == pl.sword and pl.has_master then
 			stage.lives -= 1
 			stage.vulnerable = false
@@ -736,6 +725,7 @@ function make_canon_stage1()
 			stage.vulnerable = true
 		elseif timer >= 60 then
 			stage.move_to_state("topl")
+			stage.vulnerable = false
 		else
 			-- canon was hit
 			if not stage.vulnerable then
@@ -749,17 +739,11 @@ end
 
 function make_canon_stage2()
 	local stage = make_stage()
-	stage.lives = 1
-	stage.hit_func =
-	function(self, other, stage, state)
-		if other.id == "ball" and other.good then
-			other.alive = false
-			stage.move_to_state("stunned")
-		end
-	end
+	stage.lives = 3
+	stage.hit_func = canondwarf_hit
 
 	stage.hurt_func =
-	function(self, other, stage, state)
+	function(other, stage, state)
 		if other == pl.sword and pl.has_master then
 			stage.lives -= 1
 			stage.vulnerable = false
@@ -770,7 +754,7 @@ function make_canon_stage2()
 	function(actor, stage, timer)
 		if timer == 0 then
 			-- go through cannon for second stage.
-			actor.touchable = false
+			actor.touchable=false
 			stage.move_to_state("tocenter")
 		end
 	end)
@@ -779,10 +763,11 @@ function make_canon_stage2()
 	stage.states["stunned"] = make_state(
 	function(actor, stage, timer)
 		if timer == 0 then
-			gen_skelly(actor.x, actor.y)
+			gen_skellies_in_corners()
 			stage.vulnerable = true
 		elseif timer >= 60 then
 			stage.move_to_state("tocenter")
+			stage.vulnerable = false
 		else
 			-- canon was hit.
 			if not stage.vulnerable then
@@ -820,7 +805,7 @@ function make_canon_stage2()
 				shoot_ball_to_pl(actor)
 			end
 
-			if timer % 360 == 0 then
+			if timer % 180 == 0 then
 				gen_skellies_in_corners()
 			end
 		end
@@ -840,7 +825,7 @@ function make_canon_stage3()
 		shake()
 		if timer == 0 then
 			-- be able to touch our friend.
-			actor.touchable = true
+			actor.touchable=true
 			music(-1)
 			sfx(22)
 		elseif timer > 90 then
@@ -849,6 +834,13 @@ function make_canon_stage3()
 	end)
 
 	return stage
+end
+
+-- a utility function, canondwarf's hit function
+function canondwarf_hit(other, stage, state)
+	if other.id == "ball" and other.good then
+		stage.move_to_state("stunned")
+	end
 end
 
 -- a utility function that generates four skeletons in the boss room.
@@ -865,38 +857,11 @@ function shoot_ball_to_pl(actor)
 	move_to_player(ball, .3)
 end
 
-function gen_energy_ball(x,y,dx,dy)
-	local ball = gen_bullet(x,y,dx,dy)
-	ball.spr = 119
-	ball.bad = true
-	ball.deflect = false
-	ball.id = "ball"
-
-	ball.hit=
-		function(other)
-			if other == pl.sword and pl.has_master and ball.good == false then
-				ball.deflect = true
-				ball.good = true
-			end
-		end
-
-	ball.move=function(self)
-		if ball.deflect then 
-			ball.deflect = false
-			ball.dx *= -1
-			ball.dy *= -1
-		end
-	end
-
-	return ball
-end
-
 --- TEMPORARY THINGS THAT determine canon being killed.
 function canon_kill(bad)
 	music(-1)
 
 	bad.bad = false
-	bad.static = true
 
 	-- canon isn't bad now, no need to re-add him after enemies are cleaned.
 	clean_enemies()
@@ -923,16 +888,11 @@ function canon_kill(bad)
 	-- make it look like they didn't just teleport. heh.
 	transition(marker)
 
-	ivan_reveal_cutscene()
-end
-
-function ivan_reveal_cutscene()
-	ivan_revealed = true
 	tbox("canondwarf", "you beat me. that hurt.")
 	tbox("zeldo", "lank, why did you beat up canondwarf?")
 	tbox("zeldo", "we were just about to have a tea party.")
-	tbox("ivan", "haha. ha. ha.")
-	tbox("ivan", "mwahahahahaha.")
+	tbox("canondwarf", "yeah, and you just had to interrupt my tea party.")
+	tbox("zeldo", "go home lank. we don't need you.")
 end
 -- draws how many power orbs have been collected.
 function draw_power_orbs(x, y)
@@ -968,8 +928,6 @@ function draw_items(x, y)
 		i += 1
 	end
 end
-
-
 
 function draw_text(text, x, y, col)
 	local sx = (x * 8) + offset_x()
@@ -1163,18 +1121,15 @@ function scene_draw()
 		draw_link_death()
 	end
 
-	if not ivan_revealed then
-		draw_fairy()
-	end
-
+	draw_fairy()
 	tbox_draw()
 end
 
 function _draw()
 	if not trans_active or trans_after_peak then
 		scene_draw()
-		draw_triggers() -- debugging
-		print(marker, 50, 2, 7)
+		--draw_triggers() -- debugging
+		--print(marker, 50, 2, 7)
 	end
 
 	
@@ -1246,7 +1201,6 @@ function screen_swipe(length, timer)
 
 	return timer >= flr(length / 2)
 end
-
 function gen_deku(x, y)
 	local bad = gen_enemy(x, y)
 	bad.spr = 70
@@ -1290,12 +1244,6 @@ function gen_poe(x, y)
 		function(a)
 			draw_actor(a, nil, nil, a.dx > 0, nil)
 		end
-	return bad
-end
-
-function gen_dark_link(x, y)
-	local bad = gen_enemy(x, y)
-	bad.spr = 124
 	return bad
 end
 
@@ -1349,7 +1297,6 @@ function gen_enemy(x, y)
 	return bad
 end
 
-
 function gen_bullet(x,y,dx,dy)
 	local bad = gen_enemy(x,y)
 	if dx == nil then dx = 0 end
@@ -1359,6 +1306,7 @@ function gen_bullet(x,y,dx,dy)
 	bad.inertia=1
 	bad.solid=false
 	bad.touchable=false
+	bad.deflect = false
 	bad.destroy=function(self) end
 	-- die if the bullet is out of bounds.
 	bad.outside=
@@ -1380,7 +1328,33 @@ function gen_bullet(x,y,dx,dy)
 			end
 		end
 
+	-- for reflecting the bullet
+	bad.hit=
+		function(other)
+			if other == pl.sword and pl.has_master and bad.good == false then
+				bad.deflect = true
+				bad.good = true
+			elseif other.bad and bad.good and other.touchable then
+				bad.alive = false
+			end
+		end
+
+	bad.move=function(self)
+		if bad.deflect then 
+			bad.deflect = false
+			bad.dx *= -1
+			bad.dy *= -1
+		end
+	end
+
 	return bad
+end
+
+function gen_energy_ball(x,y,dx,dy)
+	local ball = gen_bullet(x,y,dx,dy)
+	ball.spr = 119
+	ball.id = "ball"
+	return ball
 end
 
 function gen_boomerang(x, y, dir)
@@ -2197,7 +2171,7 @@ function gen_zeldo(x, y)
 
 	girl.interact =
 		function()
-			tbox("zeldo", "you must find and defeat ivan.")
+			tbox("zeldo", "go home lank.")
 		end
 
 	return girl
@@ -2342,9 +2316,6 @@ function shake(reset) -- shake the screen
 		camera(flr(rnd(2)-1),flr(rnd(2)-1)) -- define shake power here (-1 to shake equally in all directions)
 	end
 end
-
-ivan_revealed = false
-
 function make_triggers()
 	-- trigger positions
 	make_trigger("no_sword",     7,    10,    9,    12)
@@ -2361,8 +2332,6 @@ function make_triggers()
 	make_trigger("old_exit",    97,   43,    100,  44,   {x=16,   y=48.5}, "overworld", 14, -1)
 	make_trigger("shop_exit",   104,  43,    109,  44,   {x=29.5, y=56.5}, "overworld", 14, -1)
 	make_trigger("sacred_exit", 116,  55,    120,  56,   {x=32.5, y=1.5},  "overworld", 14, -1)
-
-	-- start out false
 
 	triggers["mast_intro"].func =
 		function()

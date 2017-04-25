@@ -16,9 +16,9 @@ function gen_boss(x, y)
 		local state = stage.states[stage.cur_state]
 
 		if stage.vulnerable then
-			stage.hurt_func(bad, other, stage, state)
+			stage.hurt_func(other, stage, state)
 		else
-			stage.hit_func(bad, other, stage, state)
+			stage.hit_func(other, stage, state)
 		end
 	end
 
@@ -42,7 +42,6 @@ function gen_boss(x, y)
 					bad.killed = true
 					bad.move = function() end
 					bad.hit  = function() end
-					printh("kelled heem")
 
 					bad.defeated()
 				end

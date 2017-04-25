@@ -364,14 +364,14 @@ function make_trigger(name, x1, y1, x2, y2, pos, mark, mus, snd)
 end
 
 -- used for debugging purposes.
-function draw_triggers()
-	for k,v in pairs(triggers) do
-		rect(v.box.x1*8 + offset_x(),
-			  v.box.y1*8 + offset_y(),
-			  v.box.x2*8 + offset_x(),
-			  v.box.y2*8 + offset_y(), 10)
-	end
-end
+--function draw_triggers()
+--	for k,v in pairs(triggers) do
+--		rect(v.box.x1*8 + offset_x(),
+--			  v.box.y1*8 + offset_y(),
+--			  v.box.x2*8 + offset_x(),
+--			  v.box.y2*8 + offset_y(), 10)
+--	end
+--end
 
 function trigger_update()
 	for k, v in pairs(triggers) do

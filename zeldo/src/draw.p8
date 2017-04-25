@@ -33,8 +33,6 @@ function draw_items(x, y)
 	end
 end
 
-
-
 function draw_text(text, x, y, col)
 	local sx = (x * 8) + offset_x()
 	local sy = (y * 8) + offset_y()
@@ -227,18 +225,15 @@ function scene_draw()
 		draw_link_death()
 	end
 
-	if not ivan_revealed then
-		draw_fairy()
-	end
-
+	draw_fairy()
 	tbox_draw()
 end
 
 function _draw()
 	if not trans_active or trans_after_peak then
 		scene_draw()
-		draw_triggers() -- debugging
-		print(marker, 50, 2, 7)
+		--draw_triggers() -- debugging
+		--print(marker, 50, 2, 7)
 	end
 
 	

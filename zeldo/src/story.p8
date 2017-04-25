@@ -4,7 +4,6 @@ ivan_revealed = false
 function make_triggers()
 	-- trigger positions
 	make_trigger("no_sword",     7,    10,    9,    12)
-	make_trigger("no_sword",     7,    10,    9,    12)
 	make_trigger("steal"   ,     97,   39,    100,  42)
 	make_trigger("hut_start",    97,   33,    100,  36)
 	make_trigger("mast_intro",   115,  37,    121,  41)

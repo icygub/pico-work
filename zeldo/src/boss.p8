@@ -13,10 +13,12 @@ function gen_boss(x, y)
 	bad.hit =
 	function(other)
 		local stage = bad.stages[bad.cur_stage]
+		local state = stage.states[stage.cur_state]
+
 		if stage.vulnerable then
-			stage.hurt_func(bad, other)
+			stage.hurt_func(bad, other, stage, state)
 		else
-			stage.hit_func(bad, other)
+			stage.hit_func(bad, other, stage, state)
 		end
 	end
 
@@ -32,11 +34,16 @@ function gen_boss(x, y)
 
 			-- move to next stage when this stage is defeated.
 			if stage.lives <= 0 then
-				bad.stage += 1
+				bad.cur_stage += 1
 
 				-- die when out of stages.
 				if bad.stages[bad.cur_stage] == nil then
+					-- don't call this function again and kill boss.
 					bad.killed = true
+					bad.move = function() end
+					bad.hit  = function() end
+					printh("kelled heem")
+
 					bad.defeated()
 				end
 			end
@@ -73,7 +80,9 @@ function make_stage()
 	-- setting cur_state.
 	stage.move_to_state =
 	function(state)
+		-- need to reset the timer if being reused.
 		stage.states[state].timer = 0
+		stage.cur_state = state
 	end
 
 	return stage

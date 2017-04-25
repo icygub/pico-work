@@ -1,7 +1,5 @@
---- NEW CANONDWARF!!!!!!!!
 function gen_canondwarf(x, y)
 	local bad = gen_boss(x, y)
-	add_canon_stages(bad)
 
 	bad.defeated =
 	function()
@@ -17,6 +15,7 @@ function gen_canondwarf(x, y)
 			bad.y = y
 			bad.solid = false
 			bad.touchable = true
+			add_canon_stages(bad)
 		end
 
 	bad.unload =
@@ -58,7 +57,7 @@ end
 
 function make_canon_stage1()
 	local stage = make_stage()
-	stage.lives = 3
+	stage.lives = 1
 	stage.hit_func =
 	function(self, other, stage, state)
 		if other.id == "ball" and other.good then
@@ -106,11 +105,11 @@ function make_canon_stage1()
 	stage.states["stunned"] = make_state(
 	function(actor, stage, timer)
 		if timer == 0 then
-			gen_poe(self.x, self.y)
+			gen_poe(actor.x, actor.y)
 			gen_skellies_in_corners()
 			stage.vulnerable = true
 		elseif timer >= 60 then
-			self.move_to_state("topl")
+			stage.move_to_state("topl")
 		else
 			-- canon was hit
 			if not stage.vulnerable then
@@ -124,7 +123,7 @@ end
 
 function make_canon_stage2()
 	local stage = make_stage()
-	stage.lives = 3
+	stage.lives = 1
 	stage.hit_func =
 	function(self, other, stage, state)
 		if other.id == "ball" and other.good then
@@ -146,10 +145,7 @@ function make_canon_stage2()
 		if timer == 0 then
 			-- go through cannon for second stage.
 			actor.touchable = false
-		elseif timer >= 30 then
-			stage.move_to_state("shootpl")
-		else
-			actor.dy = -.05
+			stage.move_to_state("tocenter")
 		end
 	end)
 
@@ -157,10 +153,10 @@ function make_canon_stage2()
 	stage.states["stunned"] = make_state(
 	function(actor, stage, timer)
 		if timer == 0 then
-			gen_skelly(self.x, self.y)
+			gen_skelly(actor.x, actor.y)
 			stage.vulnerable = true
 		elseif timer >= 60 then
-			self.move_to_state("tocenter")
+			stage.move_to_state("tocenter")
 		else
 			-- canon was hit.
 			if not stage.vulnerable then
@@ -217,6 +213,8 @@ function make_canon_stage3()
 	function(actor, stage, timer)
 		shake()
 		if timer == 0 then
+			-- be able to touch our friend.
+			actor.touchable = true
 			music(-1)
 			sfx(22)
 		elseif timer > 90 then
@@ -241,6 +239,31 @@ function shoot_ball_to_pl(actor)
 	move_to_player(ball, .3)
 end
 
+function gen_energy_ball(x,y,dx,dy)
+	local ball = gen_bullet(x,y,dx,dy)
+	ball.spr = 119
+	ball.bad = true
+	ball.deflect = false
+	ball.id = "ball"
+
+	ball.hit=
+		function(other)
+			if other == pl.sword and pl.has_master and ball.good == false then
+				ball.deflect = true
+				ball.good = true
+			end
+		end
+
+	ball.move=function(self)
+		if ball.deflect then 
+			ball.deflect = false
+			ball.dx *= -1
+			ball.dy *= -1
+		end
+	end
+
+	return ball
+end
 
 --- TEMPORARY THINGS THAT determine canon being killed.
 function canon_kill(bad)

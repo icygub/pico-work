@@ -1,11 +1,11 @@
 pico-8 cartridge // http://www.pico-8.com
 version 8
 __lua__
--- zeldo - by alan morgan
+-- zeldo 1.0 - by alan morgan
 
 -- comments were removed because i was running into the character limit.
 -- to see all the comments and the code in separate files go to:
--- github.com/alanxoc3/pico-work/zeldo
+-- https://github.com/alanxoc3/pico-work/tree/master/zeldo
 
 -- also put an issue on github if you notice any bugs.
 -- there isn't much token space to deal with bugs, but I'll try to fix it.

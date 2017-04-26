@@ -54,12 +54,10 @@ function gen_link(x, y)
 	local pl = make_actor(x,y)
 	pl.spr = 104
 	pl.frames = 3
-	pl.solid = false
 	pl.bounce = .1
 	pl.spd = .1
 	pl.move = control_player
-	pl.hearts = 20
-	pl.has_fairy = false
+	pl.has_fairy = 0
 	pl.draw =
 		function(self)
 			if pl.regenerate > 0 then
@@ -68,6 +66,7 @@ function gen_link(x, y)
 			draw_actor(self)
 		end
 	
+	pl.hearts = 3
 	pl.max_hearts = 3
 
 	pl.heal =
@@ -93,8 +92,8 @@ function gen_link(x, y)
 		end
 
 	pl.good=false
-	pl.has_sword=true  -- if false, then link can't use his sword.
-	pl.has_master = true
+	pl.has_sword=false  -- if false, then link can't use his sword.
+	pl.has_master=false
 	pl.sword=nil       -- used to regulate only one sword.
 	pl.regenerate=0
 
@@ -109,8 +108,8 @@ function gen_link(x, y)
 			end
 	
 			if pl.hearts == 0 then
-				if pl.has_fairy then
-					pl.has_fairy = false
+				if pl.has_fairy > 0 then
+					pl.has_fairy -= 1
 					pl.hearts = pl.max_hearts
 				else
 					pl.alive = false
@@ -119,9 +118,13 @@ function gen_link(x, y)
 		end
 	end
 
-	pl.destroy=function(other)
+	pl.destroy=function(self)
 		music(-1)
-		music(41)
+		if canon.killed then
+			music(43)
+		else
+			music(41)
+		end
 	end
 
 	return pl

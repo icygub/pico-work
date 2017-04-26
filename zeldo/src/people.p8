@@ -1,14 +1,12 @@
 function gen_zeldo(x, y)
 	local girl = gen_interactable(x, y)
-
 	girl.spr = 120
-	girl.bounce = .1
-	girl.good=true
-	girl.static=true
 
-	girl.interact =
+	girl.move =
 		function()
-			tbox("zeldo", "go home lank.")
+			if is_tbox_done() then
+				pl.alive = false
+			end
 		end
 
 	return girl

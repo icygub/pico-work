@@ -1,4 +1,3 @@
-
 ------------------------------------------------------------------------------
 -- screen shake implementation, taken from https://github.com/jessemillar/pico-8
 -- slightly modified

@@ -16,7 +16,12 @@ end
 function gen_lost_actors(path_num, path_len)
 	actors = {}
 
+	gen_skelly(98.5,46.5)
+	gen_skelly(105.5,46.5)
 	gen_skelly(102,50)
+
+	gen_skelly(98.5,53.5)
+	gen_skelly(105.5,53.5)
 
 	scene_actors[get_lost_name(path_num)] = actors
 	actors = {}
@@ -148,7 +153,8 @@ function make_final_exit(path_num, dir)
 			-- get rid of last one and enable first one.
 			toggle_lost_room(path_num, false)
 			toggle_lost_room(1, true)
-			transition("sacred", 63, 63)
+			transition("sacred")
+			sfx(63)
 		end
 end
 
@@ -160,7 +166,7 @@ function lost_woods_triggers(lost_woods_path)
 		function()
 			toggle_lost_room_str(marker, false)
 			toggle_lost_room(1, true)
-			transition("overworld")
+			transition("overworld", 14, -1) -- -1 will play no sound.
 		end
 
 	-- the keys are indexes like an array

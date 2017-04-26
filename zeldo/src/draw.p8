@@ -21,7 +21,8 @@ function draw_items(x, y)
 		add(stats, 54)
 	end
 
-	if pl.has_fairy then
+	-- may have multiple fairies.
+	for i=0, pl.has_fairy-1, 1 do
 		add(stats, 117)
 	end
 
@@ -199,7 +200,7 @@ function scene_draw()
 	if mark == "hut" then
 		draw_map(96, 32, 5, 5)
 	elseif mark == "boss" then
-		draw_map(offw, 0, 32, 32)
+		draw_map(96, 0, 16, 20)
 	elseif mark == "overworld" then
 		draw_map(0, 0, offw, offh)
 		draw_wrap(0, 0, offw, offh)
@@ -262,7 +263,10 @@ trans_song = -1
 -- call to start a transition.
 function transition(mark, music_when_done, sound_effect)
 	if not trans_active then
-		marker = mark
+		if mark != nil then
+			marker = mark
+		end
+
 		trans_active = true
 		trans_timer = 0
 		trans_after_peak = false
@@ -270,9 +274,7 @@ function transition(mark, music_when_done, sound_effect)
 
 		trans_song = music_when_done
 
-		if sound_effect == nil then
-			sfx(-1)
-		else
+		if sound_effect != nil then
 			music(-1)
 			sfx(sound_effect)
 		end

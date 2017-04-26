@@ -1,3 +1,7 @@
+thief_trig = false
+monster_near = false
+more_monster = false
+
 function make_triggers()
 	-- trigger positions
 	make_trigger("no_sword",     7,    10,    9,    12)
@@ -8,12 +12,49 @@ function make_triggers()
 	make_trigger("hut_enter",    7,    4.5,   9,    5.5,  {x=98.5,    y=36.5}, "hut",  63, -1)
 	make_trigger("old_enter",    15,   47.5,  17,   48.5, {x=98.5,    y=42.5}, "old",  63, -1)
 	make_trigger("shop_enter",   29,   55.5,  31,   56.5, {x=106.5,   y=42.5}, "shop", 63, -1)
-	make_trigger("lost_enter",   31,   0,     33,   1,    {x=102,     y=54.5}, get_lost_name(1))
+	make_trigger("lost_enter",   31,   0,     33,   1,    {x=102,     y=54.5}, get_lost_name(1), 0, -1)
 
 	make_trigger("hut_exit",    97,   37,    100,  38,   {x=8,    y=5.5},  "overworld", 14, -1)
 	make_trigger("old_exit",    97,   43,    100,  44,   {x=16,   y=48.5}, "overworld", 14, -1)
 	make_trigger("shop_exit",   104,  43,    109,  44,   {x=29.5, y=56.5}, "overworld", 14, -1)
 	make_trigger("sacred_exit", 116,  55,    120,  56,   {x=32.5, y=1.5},  "overworld", 14, -1)
+
+	make_trigger("enemies_spawn",    86,  5,    90,  9)
+	triggers["enemies_spawn"].func =
+		function()
+			if thief_trig then
+				if not monster_near then
+					tbox("ivan", "hey, listen! i think monsters are near.", "spawn")
+					monster_near = true
+				end
+
+				if monster_near and is_tbox_done("spawn") then
+					mset(22, 56, 3)
+					gen_enemies(true)
+					transition()
+					triggers["enemies_spawn"].active=false
+				end
+			end
+		end
+
+	make_trigger("more_spawn",    29,  3,    35,  6)
+	triggers["more_spawn"].func =
+		function()
+			if pl.has_master then
+				if not more_monster then
+					tbox("ivan", "watch out! your sword is attracting more monsters.", "moresp")
+					more_monster = true
+				end
+
+				if more_monster and is_tbox_done("moresp") then
+					mset(11, 25, 3)
+					clean_enemies()
+					gen_enemies(false)
+					transition()
+					triggers["more_spawn"].active=false
+				end
+			end
+		end
 
 	triggers["mast_intro"].func =
 		function()
@@ -29,7 +70,7 @@ function make_triggers()
 			tbox("lank", "...")
 			tbox("ivan", "lank, princess zeldo is being held captive by canondwarf! you gotta rescue her!")
 			tbox("lank", "who are you?")
-			tbox("ivan", "i'm your fairy")
+			tbox("ivan", "i'm your fairy.")
 			tbox("lank", "oh, okay.")
 			triggers["hut_start"].active=false
 		end
@@ -64,33 +105,16 @@ function scene_init()
 	local x = 0
 	local y = 0
 
-	if marker == "boss" then
-	--elseif marker == "overworld" then
-		--music(-1)
-		--music(14)
-	elseif marker == "hut" then
-		--music(-1)
-		--music(63)
+	if marker == "hut" then
 		if prev_marker == "title" then
 			pl.visible = true
 			pl.x = 98.5
 			pl.y = 34
 		end
-	--elseif marker == "old" then
-		--music(-1)
-		--music(63)
-	--elseif marker == "sacred" then
-		--music(-1)
-		--music(45)
-		---- just a filler song
 	elseif marker == "title" then
 		music(-1)
 		music(0)
 		pl.visible = false
-
-	--elseif marker == "shop" then
-		--music(-1)
-		--music(63)
 	end
 
 	load_scene(marker)

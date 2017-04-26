@@ -24,6 +24,10 @@ function gen_boss(x, y)
 
 	bad.move =
 	function(self)
+		if not bad.started then
+			return
+		end
+
 		local stage = bad.stages[bad.cur_stage]
 		local state = stage.states[stage.cur_state]
 

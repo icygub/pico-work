@@ -561,6 +561,10 @@ function gen_boss(x, y)
 
 	bad.move =
 	function(self)
+		if not bad.started then
+			return
+		end
+
 		local stage = bad.stages[bad.cur_stage]
 		local state = stage.states[stage.cur_state]
 
@@ -641,6 +645,8 @@ function gen_canondwarf(x, y)
 			bad.x = x
 			bad.y = y
 			bad.solid = false
+			bad.started = false
+			bad.stages = {}
 			add(bad.stages, make_canon_stage1())
 			add(bad.stages, make_canon_stage2())
 			add(bad.stages, make_canon_stage3())
@@ -670,7 +676,7 @@ function gen_canondwarf(x, y)
 			end
 		end
 
-	bad.tres_text = "trespasser."
+	bad.tres_text = "intruder."
 	bad.reset()
 
 	return bad
@@ -710,6 +716,7 @@ function make_canon_stage1()
 	function(actor, stage, timer)
 		if timer == 0 then
 			music(55) -- play actual canon music!
+			actor.spr = 108
 		elseif timer >= 30 then
 			stage.move_to_state("shootpl")
 		else
@@ -796,9 +803,9 @@ function make_canon_stage2()
 			stage.clock = dice_roll(2)
 		else
 			if stage.clock then
-				move_clockwise(actor, 3, 2, 2, timer)
+				move_clockwise(actor, 3, 7, 7, timer)
 			else
-				move_counter(actor, 3, 2, 2, timer)
+				move_counter(actor, 3, 7, 7, timer)
 			end
 
 			if timer % 60 == 0 then
@@ -866,12 +873,6 @@ function canon_kill(bad)
 	-- canon isn't bad now, no need to re-add him after enemies are cleaned.
 	clean_enemies()
 
-	bad.move=actor_interact
-	bad.interact =
-		function()
-			tbox("canondwarf", "yer such a meanie!!!")
-		end
-
 	-- get rid of the cage.
 	mset(101, 2, 98)
 	mset(102, 2, 99)
@@ -891,8 +892,9 @@ function canon_kill(bad)
 	tbox("canondwarf", "you beat me. that hurt.")
 	tbox("zeldo", "lank, why did you beat up canondwarf?")
 	tbox("zeldo", "we were just about to have a tea party.")
-	tbox("canondwarf", "yeah, and you just had to interrupt my tea party.")
-	tbox("zeldo", "go home lank. we don't need you.")
+	tbox("canondwarf", "yeah, and he messed up my organ playing.")
+	tbox("zeldo", "you know what lank, i don't like you any more.")
+	tbox("zeldo", "so... die!")
 end
 -- draws how many power orbs have been collected.
 function draw_power_orbs(x, y)
@@ -917,7 +919,8 @@ function draw_items(x, y)
 		add(stats, 54)
 	end
 
-	if pl.has_fairy then
+	-- may have multiple fairies.
+	for i=0, pl.has_fairy-1, 1 do
 		add(stats, 117)
 	end
 
@@ -1095,7 +1098,7 @@ function scene_draw()
 	if mark == "hut" then
 		draw_map(96, 32, 5, 5)
 	elseif mark == "boss" then
-		draw_map(offw, 0, 32, 32)
+		draw_map(96, 0, 16, 20)
 	elseif mark == "overworld" then
 		draw_map(0, 0, offw, offh)
 		draw_wrap(0, 0, offw, offh)
@@ -1158,7 +1161,10 @@ trans_song = -1
 -- call to start a transition.
 function transition(mark, music_when_done, sound_effect)
 	if not trans_active then
-		marker = mark
+		if mark != nil then
+			marker = mark
+		end
+
 		trans_active = true
 		trans_timer = 0
 		trans_after_peak = false
@@ -1166,9 +1172,7 @@ function transition(mark, music_when_done, sound_effect)
 
 		trans_song = music_when_done
 
-		if sound_effect == nil then
-			sfx(-1)
-		else
+		if sound_effect != nil then
 			music(-1)
 			sfx(sound_effect)
 		end
@@ -1204,18 +1208,46 @@ end
 function gen_deku(x, y)
 	local bad = gen_enemy(x, y)
 	bad.spr = 70
+	bad.shoot_spd = 60
 
 	-- deku shoots every so often.
 	bad.move =
 		function(a)
-			if a.t % 60 == 0 then
+			if a.t % bad.shoot_spd == 0 then
 				local dx = -.4
 				if a.x < pl.x then
 					dx = .4
 				end
-				gen_deku_bullet(a.x,a.y,dx,0)
+				gen_deku_bullet(a.x,a.y,dx)
 			end
 		end
+
+	return bad
+end
+
+function gen_pig(x, y)
+	local bad = gen_enemy(x, y)
+	bad.spr = 69
+
+	-- deku shoots every so often.
+	bad.move =
+		function(a)
+			if a.t % 120 == 0 then
+				local dy = -.4
+				if a.y < pl.y then
+					dy = .5
+				end
+				gen_spear(a.x,a.y,dy)
+			end
+		end
+
+	return bad
+end
+
+function gen_octorok(x, y)
+	local bad = gen_deku(x, y)
+	bad.spr = 86
+	bad.shoot_spd = 100
 
 	return bad
 end
@@ -1228,9 +1260,39 @@ function gen_skelly(x, y)
 	return bad
 end
 
-function gen_deku_bullet(x,y,dx,dy)
-	local bad = gen_bullet(x,y,dx,dy)
+function gen_deku_bullet(x,y,dx)
+	local bad = gen_bullet(x,y,dx,0)
 	bad.spr = 71
+	-- rotate the bullet
+	--bad.draw=
+		--function(a)
+			--if a.t % 40 < 10 then
+				--draw_actor(a, nil, nil, false, false)
+			--elseif a.t % 30 < 10 then
+				--draw_actor(a, nil, nil, false, true)
+			--elseif a.t % 20 < 10 then
+				--draw_actor(a, nil, nil, true, true)
+			--elseif a.t % 10 < 10 then
+				--draw_actor(a, nil, nil, true, false)
+			--end
+		--end
+
+	return bad
+end
+
+function gen_spear(x,y,dy)
+	local bad = gen_bullet(x,y,0,dy)
+	bad.spr = 85
+	-- rotate the bullet
+	bad.draw=
+		function(a)
+			if dy > 0 then
+				draw_actor(a, nil, nil, false, false)
+			else
+				draw_actor(a, nil, nil, false, true)
+			end
+		end
+
 	return bad
 end
 
@@ -1244,12 +1306,6 @@ function gen_poe(x, y)
 		function(a)
 			draw_actor(a, nil, nil, a.dx > 0, nil)
 		end
-	return bad
-end
-
-function gen_octorok(x, y)
-	local bad = gen_enemy(x, y)
-	bad.spr = 86
 	return bad
 end
 
@@ -1314,20 +1370,6 @@ function gen_bullet(x,y,dx,dy)
 			a.alive = false
 		end
 
-	-- rotate the bullet
-	bad.draw=
-		function(a)
-			if a.t % 40 < 10 then
-				draw_actor(a, nil, nil, false, false)
-			elseif a.t % 30 < 10 then
-				draw_actor(a, nil, nil, false, true)
-			elseif a.t % 20 < 10 then
-				draw_actor(a, nil, nil, true, true)
-			elseif a.t % 10 < 10 then
-				draw_actor(a, nil, nil, true, false)
-			end
-		end
-
 	-- for reflecting the bullet
 	bad.hit=
 		function(other)
@@ -1356,7 +1398,6 @@ function gen_energy_ball(x,y,dx,dy)
 	ball.id = "ball"
 	return ball
 end
-
 function gen_boomerang(x, y, dir)
 	local time = 15
 	local spd = .4
@@ -1462,9 +1503,9 @@ function gen_boomerang(x, y, dir)
 end
 
 function gen_sword(x, y, dir, master)
-	local time = 10
+	local time = 7
 	local spd = .3
-	local off = .5
+	local off = .3
 
 	local dx = 0.0
 	local dy = 0.0
@@ -1498,8 +1539,8 @@ function gen_sword(x, y, dir, master)
 
 	sword.dx = dx
 	sword.dy = dy
-	sword.w  = .5
-	sword.h  = .5
+	sword.w  = .4
+	sword.h  = .4
 
 	sword.solid = false
 	sword.touchable = false
@@ -1544,7 +1585,12 @@ end
 function gen_lost_actors(path_num, path_len)
 	actors = {}
 
+	gen_skelly(98.5,46.5)
+	gen_skelly(105.5,46.5)
 	gen_skelly(102,50)
+
+	gen_skelly(98.5,53.5)
+	gen_skelly(105.5,53.5)
 
 	scene_actors[get_lost_name(path_num)] = actors
 	actors = {}
@@ -1676,7 +1722,8 @@ function make_final_exit(path_num, dir)
 			-- get rid of last one and enable first one.
 			toggle_lost_room(path_num, false)
 			toggle_lost_room(1, true)
-			transition("sacred", 63, 63)
+			transition("sacred")
+			sfx(63)
 		end
 end
 
@@ -1688,7 +1735,7 @@ function lost_woods_triggers(lost_woods_path)
 		function()
 			toggle_lost_room_str(marker, false)
 			toggle_lost_room(1, true)
-			transition("overworld")
+			transition("overworld", 14, -1) -- -1 will play no sound.
 		end
 
 	-- the keys are indexes like an array
@@ -1704,12 +1751,16 @@ function lost_woods_triggers(lost_woods_path)
 
 	toggle_lost_room(1, true) -- make the first lost room enabled at the start.
 end
-
-
 function make_map()
 	actors = {}
 
 	gen_sign(34.5, 17.5, "the square force has protected the land of hiroll for ages.")
+	gen_chest(11.5, 24.5, 
+		function()
+			tbox("", "you found 70 power orbs! nice job!")
+			power_orb_count += 70
+		end)
+
 	gen_chest(40.5, 7.5, 
 		function()
 			heart_container()
@@ -1719,28 +1770,29 @@ function make_map()
 
 	gen_sign(14.5,48.5, "old man's house")
 	gen_grave(17.5,48.5, "here lies an even older man. i love you dad. :)")
+	gen_grave(68.5,2.5, "take my heart, i don't need it since i'm dead.")
+	gen_chest(67.5, 2.5, 
+		function()
+			heart_container()
+		end)
 
 	gen_oldman(31.5, 2.5,
 		function(self)
 			if self.state == 0 then
-				if power_orb_count >= 50 then
-					tbox("old man", "oh, you have 50 power orbs. i'll take those. hehe.")
-					power_orb_count -= 50
+				if pl.has_sword and power_orb_count >= 10 then
+					tbox("old man", "oh, you have a sword.....")
+					tbox("old man", "and power orbs. i'll take those. hehe.")
+					power_orb_count -= 10
 					mset(32,2,3) -- set the block to grass.
 					self.state = 1
 				else
 					tbox("old man", "a powerful sword along with powerful enemies lie beyond here.")
-					tbox("old man", "come back when you've collected 50 power orbs.")
+					tbox("old man", "come back when you've have something to fight with and 10 power orbs.")
 				end
 			else
 				tbox("old man", "thanks for the orbs.")
 			end
 		end)
-
-	-- things from alpha
-	gen_poe(57.5,10.5)
-	gen_poe(8, 9.5)
-	gen_enemies()
 
 	scene_actors["overworld"] = actors
 	actors = {}
@@ -1748,6 +1800,12 @@ end
 
 function make_hut()
 	actors = {}
+	gen_chest(97.5, 33.5,
+		function()
+			tbox("", "you got a fairy in a bottle.")
+			tbox("", "it will heal you if you've lost all your hearts.")
+			pl.has_fairy += 1
+		end)
 
 	scene_actors["hut"] = actors
 	actors = {}
@@ -1790,7 +1848,8 @@ function make_boss()
 	gen_chest(100.5, 2.5,
 		function()
 			power_orb_count += 49
-			canon.tres_text = "theif."
+			canon.tres_text = "thief."
+			thief_trig = true
 
 			tbox("", "you found 49 power orbs. canondwarf doesn't deserve these anyway.")
 			tbox("canondwarf", "oh now you steal from me. i'll never forgive you for this.")
@@ -1811,8 +1870,8 @@ function make_boss()
 			tbox("canondwarf", "mwahahahahahahahahahaha.")
 			tbox("canondwarf", "i see you're back. you'll pay you little "..canon.tres_text)
 			sfx(59)
+			canon.started = true
 			canon.spr = 108
-			canon.state = 1
 			triggers["canon_resume"].active=false
 		end
 
@@ -1822,11 +1881,12 @@ function make_boss()
 			tbox("canondwarf", "mwahahahahahahahahahaha.")
 			tbox("canondwarf", "who are you?")
 			tbox("lank", "i'm lank.")
-			tbox("zeldo", "lank you're here! i have to tell you something. don't listen to-")
-			tbox("canondwarf", "be quiet princess! i'm going to take care of this trespasser.")
+			tbox("zeldo", "lank you're here! don't-")
+			tbox("canondwarf", "be quiet princess! i'll take care of this loser.")
+			tbox("zeldo", "but-")
 			sfx(59)
+			canon.started = true
 			canon.spr = 108
-			canon.state = 1
 			triggers["canon_intro"].active=false
 		end
 
@@ -1845,37 +1905,23 @@ function make_shop()
 			end
 		end)
 
-	gen_item(103.5, 38.5, 50, 117,
+	gen_item(103.5, 38.5, 99, 117,
 		function(item)
-			if not pl.has_fairy then
-				tbox("", "you got a fairy in a bottle.")
-				tbox("", "it will heal you if you've lost all your hearts.")
-				pl.has_fairy = true
-				item.alive = false
-				return true
-			else
-				return false
-			end
+			tbox("", "you got a fairy in a bottle.")
+			tbox("", "it will heal you if you've lost all your hearts.")
+			pl.has_fairy += 1
 		end)
 
 	gen_item(106.5, 38.5, 49, 56,
 		function(item)
-			if not pl.has_sword then
-				tbox("", "you got a sword.")
-				tbox("", "hold z then press an arrow key to use it.")
-				pl.has_sword = true
-				item.alive = false
-				return true
-			else
-				return false
-			end
+			tbox("", "you got a sword.")
+			tbox("", "hold z then press an arrow key to use it.")
+			pl.has_sword = true
 		end)
 
-	gen_item(109.5, 38.5, 50, 118,
+	gen_item(109.5, 38.5, 99, 118,
 		function(item)
 			heart_container()
-			item.alive = false
-			return true
 		end)
 
 	scene_actors["shop"] = actors
@@ -1895,17 +1941,23 @@ end
 -----------------
 -- enemy creation
 -----------------
-function gen_enemies()
-	for i=0, 25, 1 do
-		local x = rnd(93-18)+18.5
-		local y = rnd(43) + 2.5
-		local id = flr(rnd(3))
-		if id == 0 then
-			gen_octorok(x, y)
-		elseif id == 1 then
-			gen_deku(x, y)
-		elseif id == 2 then
-			gen_skelly(x, y)
+function gen_enemies(easy)
+	for i=0, 95, 1 do
+		for j=0, 63, 1 do
+			local id = fget(mget(i,j))
+			local x = i + .5
+			local y = j + .5
+			if id == 128 then
+				gen_deku(x, y)
+			elseif id == 64 and not easy then
+				gen_pig(x, y)
+			elseif id == 32 and not easy then
+				gen_skelly(x, y)
+			elseif id == 16 then
+				gen_poe(x, y)
+			elseif id == 8 then
+				gen_octorok(x, y)
+			end
 		end
 	end
 end
@@ -1940,27 +1992,17 @@ end
 -----------------
 -- movement functions
 -----------------
+-- assumes that when timer is zero, you are at the top of the circle.
 function move_clockwise(a, spd, radx, rady, timer)
 	local ang = -timer / 30 / spd
-	a.dx = radx * spd * cos(ang) / 30
-	a.dy = rady * spd * sin(ang) / 30
-end
-
--- assumes that when timer is zero, you are at the top of the circle.
-function move_counter(a, spd, radx, rady, timer)
-	local ang = timer / 30 / spd + .5
 	a.dx = radx * cos(ang) / 30
 	a.dy = rady * sin(ang) / 30
 end
 
-function move_vertical(a)
-	local slow = 4*30
-	a.dy = a.rady * sin(a.t / slow) / 30
-end
-
-function move_horizontal(a)
-	local slow = 4*30
-	a.dx = a.radx * cos(a.t / slow) / 30
+function move_counter(a, spd, radx, rady, timer)
+	local ang = timer / 30 / spd + .5
+	a.dx = radx * cos(ang) / 30
+	a.dy = rady * sin(ang) / 30
 end
 
 function move_to_point(a, spd, x, y)
@@ -1971,13 +2013,6 @@ end
 
 function move_to_player(a, spd)
 	move_to_point(a, spd, pl.x, pl.y)
-end
-
-function move_from_player(a)
-	local slow = 2
-	local ang = atan2(a.x - pl.x, a.y - pl.y)
-	a.dx = a.radx * cos(ang) / 30 / slow
-	a.dy = a.rady * sin(ang) / 30 / slow
 end
 -- the parameter is what should happen when the player opens the chest.
 function gen_chest(x,y, func)
@@ -2032,9 +2067,9 @@ function gen_item(x,y, price, spr_ind, func)
 	item.interact =
 		function()
 			if power_orb_count >= item.price then
-				if func(item) then
-					power_orb_count -= item.price
-				end
+				func(item)
+				power_orb_count -= item.price
+				item.alive = false
 			else
 				tbox("shopkeeper", "hey, you don't have enough power orbs to buy that!")
 			end
@@ -2144,6 +2179,8 @@ function gen_sword_stand(x, y)
 	stand.interact = 
 		function()
 			if sword.alive then
+				sfx(62)
+				tbox("", "you got the master sword. you can now deflect bullets.")
 				tbox("voice", "hero of hiroll, we entrust this sword with you.")
 				tbox("voice", "beware of your friends.")
 				tbox("lank", "that was creepy.")
@@ -2163,15 +2200,13 @@ function gen_sword_stand(x, y)
 end
 function gen_zeldo(x, y)
 	local girl = gen_interactable(x, y)
-
 	girl.spr = 120
-	girl.bounce = .1
-	girl.good=true
-	girl.static=true
 
-	girl.interact =
+	girl.move =
 		function()
-			tbox("zeldo", "go home lank.")
+			if is_tbox_done() then
+				pl.alive = false
+			end
 		end
 
 	return girl
@@ -2232,12 +2267,10 @@ function gen_link(x, y)
 	local pl = make_actor(x,y)
 	pl.spr = 104
 	pl.frames = 3
-	pl.solid = false
 	pl.bounce = .1
 	pl.spd = .1
 	pl.move = control_player
-	pl.hearts = 20
-	pl.has_fairy = false
+	pl.has_fairy = 0
 	pl.draw =
 		function(self)
 			if pl.regenerate > 0 then
@@ -2246,6 +2279,7 @@ function gen_link(x, y)
 			draw_actor(self)
 		end
 	
+	pl.hearts = 3
 	pl.max_hearts = 3
 
 	pl.heal =
@@ -2271,8 +2305,8 @@ function gen_link(x, y)
 		end
 
 	pl.good=false
-	pl.has_sword=true  -- if false, then link can't use his sword.
-	pl.has_master = true
+	pl.has_sword=false  -- if false, then link can't use his sword.
+	pl.has_master=false
 	pl.sword=nil       -- used to regulate only one sword.
 	pl.regenerate=0
 
@@ -2287,8 +2321,8 @@ function gen_link(x, y)
 			end
 	
 			if pl.hearts == 0 then
-				if pl.has_fairy then
-					pl.has_fairy = false
+				if pl.has_fairy > 0 then
+					pl.has_fairy -= 1
 					pl.hearts = pl.max_hearts
 				else
 					pl.alive = false
@@ -2297,14 +2331,17 @@ function gen_link(x, y)
 		end
 	end
 
-	pl.destroy=function(other)
+	pl.destroy=function(self)
 		music(-1)
-		music(41)
+		if canon.killed then
+			music(43)
+		else
+			music(41)
+		end
 	end
 
 	return pl
 end
-
 ------------------------------------------------------------------------------
 -- screen shake implementation, taken from https://github.com/jessemillar/pico-8
 -- slightly modified
@@ -2316,6 +2353,10 @@ function shake(reset) -- shake the screen
 		camera(flr(rnd(2)-1),flr(rnd(2)-1)) -- define shake power here (-1 to shake equally in all directions)
 	end
 end
+thief_trig = false
+monster_near = false
+more_monster = false
+
 function make_triggers()
 	-- trigger positions
 	make_trigger("no_sword",     7,    10,    9,    12)
@@ -2326,12 +2367,49 @@ function make_triggers()
 	make_trigger("hut_enter",    7,    4.5,   9,    5.5,  {x=98.5,    y=36.5}, "hut",  63, -1)
 	make_trigger("old_enter",    15,   47.5,  17,   48.5, {x=98.5,    y=42.5}, "old",  63, -1)
 	make_trigger("shop_enter",   29,   55.5,  31,   56.5, {x=106.5,   y=42.5}, "shop", 63, -1)
-	make_trigger("lost_enter",   31,   0,     33,   1,    {x=102,     y=54.5}, get_lost_name(1))
+	make_trigger("lost_enter",   31,   0,     33,   1,    {x=102,     y=54.5}, get_lost_name(1), 0, -1)
 
 	make_trigger("hut_exit",    97,   37,    100,  38,   {x=8,    y=5.5},  "overworld", 14, -1)
 	make_trigger("old_exit",    97,   43,    100,  44,   {x=16,   y=48.5}, "overworld", 14, -1)
 	make_trigger("shop_exit",   104,  43,    109,  44,   {x=29.5, y=56.5}, "overworld", 14, -1)
 	make_trigger("sacred_exit", 116,  55,    120,  56,   {x=32.5, y=1.5},  "overworld", 14, -1)
+
+	make_trigger("enemies_spawn",    86,  5,    90,  9)
+	triggers["enemies_spawn"].func =
+		function()
+			if thief_trig then
+				if not monster_near then
+					tbox("ivan", "hey, listen! i think monsters are near.", "spawn")
+					monster_near = true
+				end
+
+				if monster_near and is_tbox_done("spawn") then
+					mset(22, 56, 3)
+					gen_enemies(true)
+					transition()
+					triggers["enemies_spawn"].active=false
+				end
+			end
+		end
+
+	make_trigger("more_spawn",    29,  3,    35,  6)
+	triggers["more_spawn"].func =
+		function()
+			if pl.has_master then
+				if not more_monster then
+					tbox("ivan", "watch out! your sword is attracting more monsters.", "moresp")
+					more_monster = true
+				end
+
+				if more_monster and is_tbox_done("moresp") then
+					mset(11, 25, 3)
+					clean_enemies()
+					gen_enemies(false)
+					transition()
+					triggers["more_spawn"].active=false
+				end
+			end
+		end
 
 	triggers["mast_intro"].func =
 		function()
@@ -2347,7 +2425,7 @@ function make_triggers()
 			tbox("lank", "...")
 			tbox("ivan", "lank, princess zeldo is being held captive by canondwarf! you gotta rescue her!")
 			tbox("lank", "who are you?")
-			tbox("ivan", "i'm your fairy")
+			tbox("ivan", "i'm your fairy.")
 			tbox("lank", "oh, okay.")
 			triggers["hut_start"].active=false
 		end
@@ -2382,33 +2460,16 @@ function scene_init()
 	local x = 0
 	local y = 0
 
-	if marker == "boss" then
-	--elseif marker == "overworld" then
-		--music(-1)
-		--music(14)
-	elseif marker == "hut" then
-		--music(-1)
-		--music(63)
+	if marker == "hut" then
 		if prev_marker == "title" then
 			pl.visible = true
 			pl.x = 98.5
 			pl.y = 34
 		end
-	--elseif marker == "old" then
-		--music(-1)
-		--music(63)
-	--elseif marker == "sacred" then
-		--music(-1)
-		--music(45)
-		---- just a filler song
 	elseif marker == "title" then
 		music(-1)
 		music(0)
 		pl.visible = false
-
-	--elseif marker == "shop" then
-		--music(-1)
-		--music(63)
 	end
 
 	load_scene(marker)
@@ -2531,7 +2592,7 @@ end
 -- check for button presses so we can clear text box messages
 function tbox_interact()
 	if btnp(4) and #tbox_messages>0 then
-		-- sfx(30) -- play a sound effect
+		sfx(61) -- play a sound effect
 
 		-- does the animation complete
 		if #tbox_messages>1 then
@@ -2576,10 +2637,10 @@ function tbox_draw()
 
 		-- print the message
 		if tbox_messages[1] != nil and tbox_messages[1].animation<#tbox_messages[1].line then
-			--sfx(0)
+			sfx(23)
 			tbox_messages[1].animation+=1
 		elseif tbox_messages[2] != nil and tbox_messages[2].animation<#tbox_messages[2].line then
-			--sfx(0)
+			sfx(23)
 			tbox_messages[2].animation+=1
 		end
 			

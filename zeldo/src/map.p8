@@ -1,9 +1,13 @@
-
-
 function make_map()
 	actors = {}
 
 	gen_sign(34.5, 17.5, "the square force has protected the land of hiroll for ages.")
+	gen_chest(11.5, 24.5, 
+		function()
+			tbox("", "you found 70 power orbs! nice job!")
+			power_orb_count += 70
+		end)
+
 	gen_chest(40.5, 7.5, 
 		function()
 			heart_container()
@@ -13,28 +17,29 @@ function make_map()
 
 	gen_sign(14.5,48.5, "old man's house")
 	gen_grave(17.5,48.5, "here lies an even older man. i love you dad. :)")
+	gen_grave(68.5,2.5, "take my heart, i don't need it since i'm dead.")
+	gen_chest(67.5, 2.5, 
+		function()
+			heart_container()
+		end)
 
 	gen_oldman(31.5, 2.5,
 		function(self)
 			if self.state == 0 then
-				if power_orb_count >= 50 then
-					tbox("old man", "oh, you have 50 power orbs. i'll take those. hehe.")
-					power_orb_count -= 50
+				if pl.has_sword and power_orb_count >= 10 then
+					tbox("old man", "oh, you have a sword.....")
+					tbox("old man", "and power orbs. i'll take those. hehe.")
+					power_orb_count -= 10
 					mset(32,2,3) -- set the block to grass.
 					self.state = 1
 				else
 					tbox("old man", "a powerful sword along with powerful enemies lie beyond here.")
-					tbox("old man", "come back when you've collected 50 power orbs.")
+					tbox("old man", "come back when you've have something to fight with and 10 power orbs.")
 				end
 			else
 				tbox("old man", "thanks for the orbs.")
 			end
 		end)
-
-	-- things from alpha
-	gen_poe(57.5,10.5)
-	gen_poe(8, 9.5)
-	gen_enemies()
 
 	scene_actors["overworld"] = actors
 	actors = {}
@@ -42,6 +47,12 @@ end
 
 function make_hut()
 	actors = {}
+	gen_chest(97.5, 33.5,
+		function()
+			tbox("", "you got a fairy in a bottle.")
+			tbox("", "it will heal you if you've lost all your hearts.")
+			pl.has_fairy += 1
+		end)
 
 	scene_actors["hut"] = actors
 	actors = {}
@@ -84,7 +95,8 @@ function make_boss()
 	gen_chest(100.5, 2.5,
 		function()
 			power_orb_count += 49
-			canon.tres_text = "theif."
+			canon.tres_text = "thief."
+			thief_trig = true
 
 			tbox("", "you found 49 power orbs. canondwarf doesn't deserve these anyway.")
 			tbox("canondwarf", "oh now you steal from me. i'll never forgive you for this.")
@@ -105,8 +117,8 @@ function make_boss()
 			tbox("canondwarf", "mwahahahahahahahahahaha.")
 			tbox("canondwarf", "i see you're back. you'll pay you little "..canon.tres_text)
 			sfx(59)
+			canon.started = true
 			canon.spr = 108
-			canon.state = 1
 			triggers["canon_resume"].active=false
 		end
 
@@ -116,11 +128,12 @@ function make_boss()
 			tbox("canondwarf", "mwahahahahahahahahahaha.")
 			tbox("canondwarf", "who are you?")
 			tbox("lank", "i'm lank.")
-			tbox("zeldo", "lank you're here! i have to tell you something. don't listen to-")
-			tbox("canondwarf", "be quiet princess! i'm going to take care of this trespasser.")
+			tbox("zeldo", "lank you're here! don't-")
+			tbox("canondwarf", "be quiet princess! i'll take care of this loser.")
+			tbox("zeldo", "but-")
 			sfx(59)
+			canon.started = true
 			canon.spr = 108
-			canon.state = 1
 			triggers["canon_intro"].active=false
 		end
 
@@ -139,37 +152,23 @@ function make_shop()
 			end
 		end)
 
-	gen_item(103.5, 38.5, 50, 117,
+	gen_item(103.5, 38.5, 99, 117,
 		function(item)
-			if not pl.has_fairy then
-				tbox("", "you got a fairy in a bottle.")
-				tbox("", "it will heal you if you've lost all your hearts.")
-				pl.has_fairy = true
-				item.alive = false
-				return true
-			else
-				return false
-			end
+			tbox("", "you got a fairy in a bottle.")
+			tbox("", "it will heal you if you've lost all your hearts.")
+			pl.has_fairy += 1
 		end)
 
 	gen_item(106.5, 38.5, 49, 56,
 		function(item)
-			if not pl.has_sword then
-				tbox("", "you got a sword.")
-				tbox("", "hold z then press an arrow key to use it.")
-				pl.has_sword = true
-				item.alive = false
-				return true
-			else
-				return false
-			end
+			tbox("", "you got a sword.")
+			tbox("", "hold z then press an arrow key to use it.")
+			pl.has_sword = true
 		end)
 
-	gen_item(109.5, 38.5, 50, 118,
+	gen_item(109.5, 38.5, 99, 118,
 		function(item)
 			heart_container()
-			item.alive = false
-			return true
 		end)
 
 	scene_actors["shop"] = actors
@@ -189,17 +188,23 @@ end
 -----------------
 -- enemy creation
 -----------------
-function gen_enemies()
-	for i=0, 25, 1 do
-		local x = rnd(93-18)+18.5
-		local y = rnd(43) + 2.5
-		local id = flr(rnd(3))
-		if id == 0 then
-			gen_octorok(x, y)
-		elseif id == 1 then
-			gen_deku(x, y)
-		elseif id == 2 then
-			gen_skelly(x, y)
+function gen_enemies(easy)
+	for i=0, 95, 1 do
+		for j=0, 63, 1 do
+			local id = fget(mget(i,j))
+			local x = i + .5
+			local y = j + .5
+			if id == 128 then
+				gen_deku(x, y)
+			elseif id == 64 and not easy then
+				gen_pig(x, y)
+			elseif id == 32 and not easy then
+				gen_skelly(x, y)
+			elseif id == 16 then
+				gen_poe(x, y)
+			elseif id == 8 then
+				gen_octorok(x, y)
+			end
 		end
 	end
 end

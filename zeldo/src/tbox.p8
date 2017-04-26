@@ -115,7 +115,7 @@ end
 -- check for button presses so we can clear text box messages
 function tbox_interact()
 	if btnp(4) and #tbox_messages>0 then
-		-- sfx(30) -- play a sound effect
+		sfx(61) -- play a sound effect
 
 		-- does the animation complete
 		if #tbox_messages>1 then
@@ -160,10 +160,10 @@ function tbox_draw()
 
 		-- print the message
 		if tbox_messages[1] != nil and tbox_messages[1].animation<#tbox_messages[1].line then
-			--sfx(0)
+			sfx(23)
 			tbox_messages[1].animation+=1
 		elseif tbox_messages[2] != nil and tbox_messages[2].animation<#tbox_messages[2].line then
-			--sfx(0)
+			sfx(23)
 			tbox_messages[2].animation+=1
 		end
 			

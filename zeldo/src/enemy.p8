@@ -1,18 +1,46 @@
 function gen_deku(x, y)
 	local bad = gen_enemy(x, y)
 	bad.spr = 70
+	bad.shoot_spd = 60
 
 	-- deku shoots every so often.
 	bad.move =
 		function(a)
-			if a.t % 60 == 0 then
+			if a.t % bad.shoot_spd == 0 then
 				local dx = -.4
 				if a.x < pl.x then
 					dx = .4
 				end
-				gen_deku_bullet(a.x,a.y,dx,0)
+				gen_deku_bullet(a.x,a.y,dx)
 			end
 		end
+
+	return bad
+end
+
+function gen_pig(x, y)
+	local bad = gen_enemy(x, y)
+	bad.spr = 69
+
+	-- deku shoots every so often.
+	bad.move =
+		function(a)
+			if a.t % 120 == 0 then
+				local dy = -.4
+				if a.y < pl.y then
+					dy = .5
+				end
+				gen_spear(a.x,a.y,dy)
+			end
+		end
+
+	return bad
+end
+
+function gen_octorok(x, y)
+	local bad = gen_deku(x, y)
+	bad.spr = 86
+	bad.shoot_spd = 100
 
 	return bad
 end
@@ -25,9 +53,39 @@ function gen_skelly(x, y)
 	return bad
 end
 
-function gen_deku_bullet(x,y,dx,dy)
-	local bad = gen_bullet(x,y,dx,dy)
+function gen_deku_bullet(x,y,dx)
+	local bad = gen_bullet(x,y,dx,0)
 	bad.spr = 71
+	-- rotate the bullet
+	--bad.draw=
+		--function(a)
+			--if a.t % 40 < 10 then
+				--draw_actor(a, nil, nil, false, false)
+			--elseif a.t % 30 < 10 then
+				--draw_actor(a, nil, nil, false, true)
+			--elseif a.t % 20 < 10 then
+				--draw_actor(a, nil, nil, true, true)
+			--elseif a.t % 10 < 10 then
+				--draw_actor(a, nil, nil, true, false)
+			--end
+		--end
+
+	return bad
+end
+
+function gen_spear(x,y,dy)
+	local bad = gen_bullet(x,y,0,dy)
+	bad.spr = 85
+	-- rotate the bullet
+	bad.draw=
+		function(a)
+			if dy > 0 then
+				draw_actor(a, nil, nil, false, false)
+			else
+				draw_actor(a, nil, nil, false, true)
+			end
+		end
+
 	return bad
 end
 
@@ -41,12 +99,6 @@ function gen_poe(x, y)
 		function(a)
 			draw_actor(a, nil, nil, a.dx > 0, nil)
 		end
-	return bad
-end
-
-function gen_octorok(x, y)
-	local bad = gen_enemy(x, y)
-	bad.spr = 86
 	return bad
 end
 
@@ -109,20 +161,6 @@ function gen_bullet(x,y,dx,dy)
 	bad.outside=
 		function(a)
 			a.alive = false
-		end
-
-	-- rotate the bullet
-	bad.draw=
-		function(a)
-			if a.t % 40 < 10 then
-				draw_actor(a, nil, nil, false, false)
-			elseif a.t % 30 < 10 then
-				draw_actor(a, nil, nil, false, true)
-			elseif a.t % 20 < 10 then
-				draw_actor(a, nil, nil, true, true)
-			elseif a.t % 10 < 10 then
-				draw_actor(a, nil, nil, true, false)
-			end
 		end
 
 	-- for reflecting the bullet

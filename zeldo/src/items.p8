@@ -1,4 +1,3 @@
-
 function gen_boomerang(x, y, dir)
 	local time = 15
 	local spd = .4
@@ -104,9 +103,9 @@ function gen_boomerang(x, y, dir)
 end
 
 function gen_sword(x, y, dir, master)
-	local time = 10
+	local time = 7
 	local spd = .3
-	local off = .5
+	local off = .3
 
 	local dx = 0.0
 	local dy = 0.0
@@ -140,8 +139,8 @@ function gen_sword(x, y, dir, master)
 
 	sword.dx = dx
 	sword.dy = dy
-	sword.w  = .5
-	sword.h  = .5
+	sword.w  = .4
+	sword.h  = .4
 
 	sword.solid = false
 	sword.touchable = false

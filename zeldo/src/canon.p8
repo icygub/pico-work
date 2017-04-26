@@ -16,6 +16,8 @@ function gen_canondwarf(x, y)
 			bad.x = x
 			bad.y = y
 			bad.solid = false
+			bad.started = false
+			bad.stages = {}
 			add(bad.stages, make_canon_stage1())
 			add(bad.stages, make_canon_stage2())
 			add(bad.stages, make_canon_stage3())
@@ -45,7 +47,7 @@ function gen_canondwarf(x, y)
 			end
 		end
 
-	bad.tres_text = "trespasser."
+	bad.tres_text = "intruder."
 	bad.reset()
 
 	return bad
@@ -85,6 +87,7 @@ function make_canon_stage1()
 	function(actor, stage, timer)
 		if timer == 0 then
 			music(55) -- play actual canon music!
+			actor.spr = 108
 		elseif timer >= 30 then
 			stage.move_to_state("shootpl")
 		else
@@ -171,9 +174,9 @@ function make_canon_stage2()
 			stage.clock = dice_roll(2)
 		else
 			if stage.clock then
-				move_clockwise(actor, 3, 2, 2, timer)
+				move_clockwise(actor, 3, 7, 7, timer)
 			else
-				move_counter(actor, 3, 2, 2, timer)
+				move_counter(actor, 3, 7, 7, timer)
 			end
 
 			if timer % 60 == 0 then
@@ -241,12 +244,6 @@ function canon_kill(bad)
 	-- canon isn't bad now, no need to re-add him after enemies are cleaned.
 	clean_enemies()
 
-	bad.move=actor_interact
-	bad.interact =
-		function()
-			tbox("canondwarf", "yer such a meanie!!!")
-		end
-
 	-- get rid of the cage.
 	mset(101, 2, 98)
 	mset(102, 2, 99)
@@ -266,6 +263,7 @@ function canon_kill(bad)
 	tbox("canondwarf", "you beat me. that hurt.")
 	tbox("zeldo", "lank, why did you beat up canondwarf?")
 	tbox("zeldo", "we were just about to have a tea party.")
-	tbox("canondwarf", "yeah, and you just had to interrupt my tea party.")
-	tbox("zeldo", "go home lank. we don't need you.")
+	tbox("canondwarf", "yeah, and he messed up my organ playing.")
+	tbox("zeldo", "you know what lank, i don't like you any more.")
+	tbox("zeldo", "so... die!")
 end

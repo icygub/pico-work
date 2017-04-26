@@ -51,9 +51,9 @@ function gen_item(x,y, price, spr_ind, func)
 	item.interact =
 		function()
 			if power_orb_count >= item.price then
-				if func(item) then
-					power_orb_count -= item.price
-				end
+				func(item)
+				power_orb_count -= item.price
+				item.alive = false
 			else
 				tbox("shopkeeper", "hey, you don't have enough power orbs to buy that!")
 			end
@@ -163,6 +163,8 @@ function gen_sword_stand(x, y)
 	stand.interact = 
 		function()
 			if sword.alive then
+				sfx(62)
+				tbox("", "you got the master sword. you can now deflect bullets.")
 				tbox("voice", "hero of hiroll, we entrust this sword with you.")
 				tbox("voice", "beware of your friends.")
 				tbox("lank", "that was creepy.")

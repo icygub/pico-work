@@ -1,0 +1,9 @@
+#+TITLE: Zeldo
+#+AUTHOR: Alan Morgan
+
+A Pico 8 game.
+
+| final.p8.png | The game!!!                                                |
+| final.p8     | The final file that is able to export to a .p8.png file.   |
+| out.p8       | The compiled file of res.p8 and all the files in src/.     |
+| src/         | A bunch of smaller files that I used to manage complexity. |
